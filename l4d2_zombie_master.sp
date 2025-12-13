@@ -25,7 +25,7 @@
 #define WITCH_STATIC 0
 #define WITCH_MOVING 1
 
-#define SUICIDE_TIME 10
+bool DEBUG = false;
 
 #define MODEL_SMOKER "models/infected/smoker.mdl"
 #define MODEL_BOOMER "models/infected/boomer.mdl"
@@ -110,6 +110,7 @@ Menu ZM_menu = null;
 bool zm_menu_IsOpen = false; // track if menu is open to update zm UI data
 Handle zm_timer = null;
 char ZM_hint[32]; 
+bool zm_deleted = false; //track if ZM just deleted something, for checks in removal of entity
 
 // Kick AFK ZM due to inactivity
 float t_zm_activity = 0.0;
@@ -122,10 +123,10 @@ void update_t_zm_activity(float new_t = -1.0)
 }
 
 // Cooldowns and ZM anti-spam features
-int SIs_available = 0;
-int witches_available = 0;
-float cooldown_specials = 10.0; //cooldown time for SI and witch
-float cooldown_common = 0.01; // cooldown for zombie horde
+//int SIs_available = 0;
+//int witches_available = 0;
+//float cooldown_specials = 10.0; //cooldown time for SI and witch
+//float cooldown_common = 0.01; // cooldown for zombie horde
 
 // each SI: independent timers. do not allow ZM to spawn more than survivors/2 same SI
 
@@ -192,29 +193,29 @@ stock bool IsValidEntRef(int entity)
 
 void check_saferoom()
 {
-   PrintToServer("[zm] check_saferoom");
+   if (DEBUG) PrintToServer("[zm] check_saferoom");
    if (g_iLockedDoor==SAFEROOM_UNKNOWN)
    {
-        PrintToServer("[zm] L4D_GetCheckpointFirst");
+        if (DEBUG) PrintToServer("[zm] L4D_GetCheckpointFirst");
         g_iLockedDoor = L4D_GetCheckpointFirst();
-        if (IsValidEntRef(g_iLockedDoor))
+        if (IsValidEntRef(g_iLockedDoor) && IsValidEntity(g_iLockedDoor))
         {
-            PrintToServer("[zm] get m_spawnflags");
+            if (DEBUG) PrintToServer("[zm] get m_spawnflags");
             g_iFirstFlags = GetEntProp(g_iLockedDoor, Prop_Send, "m_spawnflags");
         }
         else
         {
-            PrintToServer("[zm] no saferoom, ignoring");
+            if (DEBUG) PrintToServer("[zm] no saferoom, ignoring");
             g_iLockedDoor = SAFEROOM_NO;
             g_iFirstFlags = -1;
         }
    }
-   PrintToServer("[zm] check_saferoom done");
+   if (DEBUG) PrintToServer("[zm] check_saferoom done");
 }
 
 void can_zm_start()
 {
-   PrintToServer("[zm] can_zm_start");
+   if (DEBUG) PrintToServer("[zm] can_zm_start");
    if (!g_bLockSaferoom || zm_can_start) // Option 2: do not re-lock saferoom after first "round can start" announcement
    //if (!g_bLockSaferoom) // Option 1: allow saferoom to be relocked
    {
@@ -289,7 +290,7 @@ void freeze_player(int client, bool state = true, int team = TEAM_SURVIVOR)
 // Call this if you want to freeze silently (for periodic refreezing)
 void freeze_team(bool state = true, int team = TEAM_SURVIVOR)
 {
-    PrintToServer("[zm] freeze_team");
+    if (DEBUG) PrintToServer("[zm] freeze_team");
     //check_saferoom();
     for (int i=1;i<=MaxClients;i++)
     {
@@ -302,7 +303,7 @@ void freeze_team(bool state = true, int team = TEAM_SURVIVOR)
 
 void saferoom_lock(bool state)
 {
-    PrintToServer("[zm] saferoom_lock");
+    if (DEBUG) PrintToServer("[zm] saferoom_lock");
     check_saferoom();
     
     if ( g_iLockedDoor<=0 || !IsValidEntRef(g_iLockedDoor) )
@@ -310,12 +311,12 @@ void saferoom_lock(bool state)
         
         if (state && !zm_started && g_bLockSaferoom)
         {
-            PrintToServer("[zm] Can't lock - Freezing survivors");
+            if (DEBUG) PrintToServer("[zm] Can't lock - Freezing survivors");
             freeze_team(true);
         }
         else
         {
-            PrintToServer("[zm] Can't unlock - Unfreezing survivors");
+            if (DEBUG) PrintToServer("[zm] Can't unlock - Unfreezing survivors");
             freeze_team(false);
         }
         
@@ -338,7 +339,7 @@ void saferoom_lock(bool state)
         SetEntProp(g_iLockedDoor, Prop_Send, "m_spawnflags", g_iFirstFlags|DOOR_FLAG_IGNORE_USE);
         saferoom_glow(true);
         saferoom_locked=true;
-        PrintToServer("[zm] Locked saferoom");
+        if (DEBUG) PrintToServer("[zm] Locked saferoom");
     }
     else
     {
@@ -349,7 +350,7 @@ void saferoom_lock(bool state)
         saferoom_glow(false);
         saferoom_locked=false;
         freeze_team(false);
-        PrintToServer("[zm] Unlocked saferoom");
+        if (DEBUG) PrintToServer("[zm] Unlocked saferoom");
     }
     
     //door_state = GetEntProp(g_iLockedDoor,Prop_Send,"m_eDoorState");
@@ -361,7 +362,7 @@ void saferoom_lock(bool state)
 
 void saferoom_glow(bool state=true)
 {
-   PrintToServer("[zm] saferoom_glow");
+   if (DEBUG) PrintToServer("[zm] saferoom_glow");
    check_saferoom();
    if (!IsValidEntRef(g_iLockedDoor) ) return;
    
@@ -413,7 +414,7 @@ void saferoom_glow(bool state=true)
 
 stock int GetEntityCountEx()
 {
-	PrintToServer("[zm] GetEntityCountEx");
+	if (DEBUG) PrintToServer("[zm] GetEntityCountEx");
 	int ent;
 	int cnt;
 	for(ent = 0; ent < MAXENTITIES; ent++)
@@ -443,7 +444,7 @@ bool IsValidClientZM(int client=-1)
 
 void announce_finale()
 {
-    PrintToServer("[zm] announce_finale");
+    if (DEBUG) PrintToServer("[zm] announce_finale");
     if (!ZM_finale_announced)
     {
         if (IsValidClientZM()) PrintHintText(zm_client, "The Finale has started. Use up your bank to advance the stage.");
@@ -527,7 +528,7 @@ void Chase(int target)
 int panic_target = -1;
 void toggle_panic(bool state = true, bool overwrite = false, bool free = false)
 {
-    PrintToServer("[zm] toggle_panic");
+    if (DEBUG) PrintToServer("[zm] toggle_panic");
     bool actual_state;
     if (overwrite) actual_state = state;
     else
@@ -615,11 +616,11 @@ float get_bank_rate()
 
 
 // Round start hook actually runs first and only then mapstart!!! WHAT THE FUCK VALVE
-void zm_new_round(bool roundstart=true,bool mapstart=false)
+void zm_new_round()
 {
     if (!g_bCvarAllow) return;
     
-    PrintToServer("[zm] zm_new_round");
+    if (DEBUG) PrintToServer("[zm] zm_new_round");
     
     check_saferoom();
     
@@ -665,13 +666,15 @@ void zm_new_round(bool roundstart=true,bool mapstart=false)
     
     //if (g_bLockSaferoom && !saferoom_locked) saferoom_lock(true);
     
+    zm_deleted = false;
+    
 }
 
 // Might as well run this at the same time as count player survivors...
 void UpdateLiveSI(bool fast = true)
 {
 	if (live_SI<=0 && fast) return;
-	PrintToServer("[zm] UpdateLiveSI expensive");
+	if (DEBUG) PrintToServer("[zm] UpdateLiveSI expensive");
 	int temp_SI = 0;
 	AllPlayerCount = 0;
 	for (int i=1;i<=MaxClients;i++)
@@ -695,7 +698,7 @@ void UpdateLiveSI(bool fast = true)
 
 void create_ZM_menu()
 {		
-	PrintToServer("[zm] create_ZM_menu");
+	if (DEBUG) PrintToServer("[zm] create_ZM_menu");
 	zm_menu_IsOpen = false;
 	ZM_menu = new Menu(ZM_MenuHandler);
 	//ZM_menu = CreateMenuEx(GetMenuStyleHandle(MenuStyle_Radio),ZM_MenuHandler);
@@ -863,7 +866,7 @@ void CountCommons(bool fast = true)
 {
     if (live_commons>0 || !fast || panic)
     {
-        PrintToServer("[zm] CountCommons expensive");
+        if (DEBUG) PrintToServer("[zm] CountCommons expensive");
         live_commons = L4D_GetCommonsCount();
         if (!panic)
         {
@@ -883,7 +886,7 @@ void CountCommons(bool fast = true)
 Action zm_update(Handle Timer)
 {
    
-   PrintToServer("[zm] zm_update"); 
+   if (DEBUG) PrintToServer("[zm] zm_update"); 
    
    if (!g_bCvarAllow)
    {
@@ -1050,7 +1053,7 @@ void ConVarChanged_Allow(ConVar convar, const char[] oldValue, const char[] newV
 public void OnPluginStart()
 {
 	//LoadTranslations("l4d2_zombie_master.phrases");
-    PrintToServer("[zm] OnPluginStart");
+    if (DEBUG) PrintToServer("[zm] OnPluginStart");
 	GetGameData();
 	ZM_finale_announced = false;
 	ZM_finale_ended = false;
@@ -1182,14 +1185,14 @@ public void OnPluginStart()
 // update zmenu when these cvars change
 void ConVarChanged_Cvars_ZMenu(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-    PrintToServer("[zm] ConVarChanged_Cvars_ZMenu");
+    if (DEBUG) PrintToServer("[zm] ConVarChanged_Cvars_ZMenu");
     GetCvars();
     SetCvarsZM();
     create_ZM_menu();
     if (zm_client>0 && IsClientInGame(zm_client) && zm_menu_IsOpen)
     {
 	   ZM_menu.Display(zm_client,MENU_TIME_FOREVER);
-	   PrintToServer("[zm] zmenu cvars changed, redisplaying."); 
+	   if (DEBUG) PrintToServer("[zm] zmenu cvars changed, redisplaying."); 
 	}
 	if (g_bCvarAllow && zm_started && zm_client>0) zm_update(zm_timer);
 }
@@ -1203,7 +1206,7 @@ void ConVarChanged_Cvars(ConVar convar, const char[] oldValue, const char[] newV
 void GetCvars()
 {
     
-    PrintToServer("[zm] GetCvars");
+    if (DEBUG) PrintToServer("[zm] GetCvars");
     g_fUpdateRate = g_hUpdateRate.FloatValue;
     ResetTimer();
     
@@ -1242,7 +1245,7 @@ void GetCvars()
 
 Action JoinZM(int client, int args)
 {
-	PrintToServer("[zm] JoinZM");
+	if (DEBUG) PrintToServer("[zm] JoinZM");
 	if (!g_bCvarAllow) return Plugin_Continue;
 	if (client<=0 || IsFakeClient(client)) return Plugin_Continue;
 	if (zm_client>0 && IsClientInGame(zm_client))
@@ -1250,6 +1253,8 @@ Action JoinZM(int client, int args)
        if (client==zm_client)
        {
           ChangeClientTeam(client,TEAM_SPECTATOR);
+          SetEntProp(client, Prop_Data, "m_iObserverMode", 6); //thanks to EHG https://forums.alliedmods.net/showthread.php?p=1080991
+          // Teleport ZM to random survivor at round start on initial ZM join
           zm_update(zm_timer);
           ZM_menu.Display(zm_client,MENU_TIME_FOREVER);
           zm_menu_IsOpen = true; 
@@ -1291,7 +1296,7 @@ Action ZM_Rain_Toggle(int client)
 
 void toggle_rain(int client)
 {
-	PrintToServer("[zm] toggle_rain");
+	if (DEBUG) PrintToServer("[zm] toggle_rain");
 	if (!g_bCvarAllow || client<=0 || zm_client<=0 || client!=zm_client || IsFakeClient(client) || !IsClientInGame(client)) return;
 	
 	if (rain_entity>0)
@@ -1364,7 +1369,7 @@ Action ZM_Snow_Toggle(int client)
 
 void toggle_snow(int client)
 {
-	PrintToServer("[zm] toggle_snow");
+	if (DEBUG) PrintToServer("[zm] toggle_snow");
 	if (!g_bCvarAllow || client<=0 || zm_client<=0 || client!=zm_client || IsFakeClient(client) || !IsClientInGame(client)) return;
 	
 	if (snow_entity>0)
@@ -1439,7 +1444,7 @@ void toggle_snow(int client)
 
 Action QuitZM(int client, int args)
 {
-	PrintToServer("[zm] QuitZM");
+	if (DEBUG) PrintToServer("[zm] QuitZM");
 	if (!g_bCvarAllow || client<=0 || IsFakeClient(client) || !IsClientInGame(client)) return Plugin_Continue;
 	if (zm_client>0 && client==zm_client)
 	{
@@ -1462,7 +1467,7 @@ Action QuitZM(int client, int args)
 
 Action zm_finale_advance(int client, int args)
 {
-  PrintToServer("[zm] zm_finale_advance");
+  if (DEBUG) PrintToServer("[zm] zm_finale_advance");
   if (L4D_IsFinaleActive()) L4D2_ForceNextStage();
   else PrintToServer("[zm] Finale is not active"); 
   return Plugin_Continue;
@@ -1470,7 +1475,7 @@ Action zm_finale_advance(int client, int args)
 
 Action zm_addbank(int client, int args)
 {
-    PrintToServer("[zm] zm_addbank");
+    if (DEBUG) PrintToServer("[zm] zm_addbank");
     if (!g_bCvarAllow) return Plugin_Continue;
     if (args>0)
     {
@@ -1484,7 +1489,7 @@ Action zm_addbank(int client, int args)
 
 Action zm_unlock(int client, int args)
 {
-    PrintToServer("[zm] zm_unlock");
+    if (DEBUG) PrintToServer("[zm] zm_unlock");
     if (!g_bCvarAllow) return Plugin_Continue;
     if (client==zm_client || CheckCommandAccess(client,"is_a_sm_admin",ADMFLAG_GENERIC,true))
     {
@@ -1507,7 +1512,7 @@ Action zm_unlock(int client, int args)
 
 void UpdateZMSpawnerPos()
 {
-	PrintToServer("[zm] UpdateZMSpawnerPos");
+	if (DEBUG) PrintToServer("[zm] UpdateZMSpawnerPos");
 	if (zm_client<=0) return;
 	float vAngles[3],vOrigin[3],vPos[3];
 	GetClientAbsOrigin(zm_client,vPos);
@@ -1566,7 +1571,7 @@ void refresh_zm_ui()
     if (IsValidClientZM())
     {
        PrintToChat(zm_client,ZM_hint);
-       PrintToServer("[zm] refresh_zm_ui");
+       if (DEBUG) PrintToServer("[zm] refresh_zm_ui");
     }
 }
 
@@ -1586,7 +1591,7 @@ bool can_any_alive_survivor_see(float vecPos[3])
    
    if (zm_client<=0 || !IsClientInGame(zm_client) || !IsValidClient(zm_client)) return true; // in case zm crashed
    
-   PrintToServer("[zm] can_any_alive_survivor_see");
+   if (DEBUG) PrintToServer("[zm] can_any_alive_survivor_see");
    
    //if (IsLocationFoggedToSurvivors(vecPos)) return false;
    
@@ -1626,11 +1631,11 @@ bool can_any_alive_survivor_see(float vecPos[3])
    return false;
 }
 
-int client_nearest_chase = 0; // store nearest client to chase while this is running
+//int client_nearest_chase = 0; // store nearest client to chase while this is running
 // Find smallest distance to survivor. Check both ways in case survivor is about to appear here.
 float min_distance_to_survivors(float vecPos[3])
 {
-   PrintToServer("[zm] min_distance_to_survivors");
+   if (DEBUG) PrintToServer("[zm] min_distance_to_survivors");
    float min_distance = -1.0;
    float survivor_origin[3];
    float temp_dist1, temp_dist2;
@@ -1697,7 +1702,7 @@ float min_distance_to_survivors(float vecPos[3])
 
 void ZM_Horde(int client, int count=10)
 {
-	PrintToServer("[zm] ZM_Horde");
+	if (DEBUG) PrintToServer("[zm] ZM_Horde");
 	if (!g_bCvarAllow || client<=0 || client!=zm_client || zm_client<=0 || IsFakeClient(client) || !IsClientInGame(zm_client)) return;
 	
 	update_t_zm_activity();
@@ -1824,7 +1829,7 @@ void ZM_Horde(int client, int count=10)
 		else continue;
 		if (zombie<=0)
     	{
-            	PrintToServer("[zm] Spawn failed");
+            	if (DEBUG) PrintToServer("[zm] Spawn failed");
             	bank += temp_cost;
             	live_commons -= 1;
         }
@@ -1876,7 +1881,7 @@ return Plugin_Continue;
 void ZM_Witch(int client,int witch_type)
 {
 
-	PrintToServer("[zm] ZM_Witch");
+	if (DEBUG) PrintToServer("[zm] ZM_Witch");
 	if (!g_bCvarAllow || client<=0 || client!=zm_client || zm_client<=0 || IsFakeClient(client) || !IsClientInGame(zm_client)) return;
 	
 	update_t_zm_activity();
@@ -1958,7 +1963,7 @@ void ZM_Witch(int client,int witch_type)
 void CountWitches(bool fast = true)
 {
     if (live_witches<=0 && fast) return;
-    PrintToServer("[zm] CountWitches expensive");
+    if (DEBUG) PrintToServer("[zm] CountWitches expensive");
     live_witches = 0;
     int entity = -1;
     while ( ((entity = FindEntityByClassname(entity, "witch")) != -1) )
@@ -1967,7 +1972,6 @@ void CountWitches(bool fast = true)
     }
 }
 
-bool zm_deleted = false; //track if ZM just deleted something, for checks in removal of entity
 void delete_all_infected(bool common=true, bool witch=true, bool special=true)
 {
    	bool anything_to_delete = false;
@@ -1990,7 +1994,7 @@ void delete_all_infected(bool common=true, bool witch=true, bool special=true)
    	}
    	if (!anything_to_delete) return;
    	
-   	PrintToServer("[zm] delete_all_infected");
+   	if (DEBUG) PrintToServer("[zm] delete_all_infected");
    	
    	static char class[32];
    	int entity;
@@ -2021,7 +2025,7 @@ Action ZM_Spawn_Witch(int client, int args)
 void zm_del_pointing(int client)
 {
    
-   PrintToServer("[zm] zm_del_pointing");
+   if (DEBUG) PrintToServer("[zm] zm_del_pointing");
    if (!g_bCvarAllow || client!=zm_client || zm_client<=0 || IsFakeClient(client) || !IsClientInGame(zm_client)) return;
    
    update_t_zm_activity();
@@ -2059,7 +2063,7 @@ public Action evtPlayerDeath(Event event, const char[] name, bool dontBroadcast)
     
     if (!g_bCvarAllow) return Plugin_Continue;
     
-    PrintToServer("[zm] evtPlayerDeath");
+    if (DEBUG) PrintToServer("[zm] evtPlayerDeath");
     
     // Skip victims that are infected entities
     int victim = GetClientOfUserId(event.GetInt("userid"));
@@ -2090,7 +2094,7 @@ public Action evtPlayerDeath(Event event, const char[] name, bool dontBroadcast)
 
 void ZM_Spawn_SI(int client, int ZOMBIECLASS)
 {
-	PrintToServer("[zm] ZM_Spawn_SI");
+	if (DEBUG) PrintToServer("[zm] ZM_Spawn_SI");
 	if (!g_bCvarAllow || client!=zm_client || IsFakeClient(client) || zm_client<=0 || !IsClientInGame(zm_client) || ZOMBIECLASS<=0) return;
 	
 	update_t_zm_activity();
@@ -2226,14 +2230,14 @@ Action OnTakeDamage_Units(int victim, int &attacker, int &inflictor, float &dama
         //PrintToServer("[zm] OnTakeDamage_Units");
         int health = GetEntProp(victim, Prop_Data, "m_iHealth");
         int max_health = GetEntProp(victim, Prop_Data, "m_iMaxHealth");
-        PrintToServer("[zm] Unit %d (%d/%d) taking %f damage from %d %d %d", victim, health, max_health, damage, attacker, inflictor, weapon);
+        if (DEBUG) PrintToServer("[zm] Unit %d (%d/%d) taking %f damage from %d %d %d", victim, health, max_health, damage, attacker, inflictor, weapon);
         //if (!zm_started)
         
         if (victim!=attacker)
         {
            SDKUnhook(victim, SDKHook_OnTakeDamageAlive, OnTakeDamage_Units);
            SDKUnhook(victim, SDKHook_OnTakeDamage, OnTakeDamage_Units);
-           PrintToServer("[zm] Unit %d unhooked - no refunds", victim);
+           if (DEBUG) PrintToServer("[zm] Unit %d unhooked - no refunds", victim);
         }
         
         // Unhook if unit takes damage from survivors -- no more refunds :)
@@ -2321,7 +2325,7 @@ Action ZM_Delete_Witches(int client, int args)
 
 void ResetCvars()
 {
-    PrintToServer("[zm] ResetCvars");
+    if (DEBUG) PrintToServer("[zm] ResetCvars");
     ResetConVar(FindConVar("z_common_limit"), true, true);
     ResetConVar(FindConVar("z_background_limit"), true, true);
 	ResetConVar(FindConVar("z_minion_limit"), true, true);
@@ -2360,7 +2364,7 @@ void ResetCvars()
 // Re-run this if player number has changed
 void SetCvarsZM()
 {
-   PrintToServer("[zm] SetCvarsZM");
+   if (DEBUG) PrintToServer("[zm] SetCvarsZM");
    if (!g_bCvarAllow) return;
    
    // asdf director_stop
@@ -2421,7 +2425,7 @@ public void OnPluginEnd()
 	//for( int i = 1; i <= MaxClients; i++ )
 	//{
 	//}
-    PrintToServer("[zm] OnPluginEnd");
+    if (DEBUG) PrintToServer("[zm] OnPluginEnd");
     ResetCvars();
     ResetTimer();
     //if (zm_client>0 && IsClientInGame(zm_client))
@@ -2471,10 +2475,10 @@ void PluginPrecacheModel(const char[] model)
 
 public void OnMapStart()
 {
-    PrintToServer("[zm] OnMapStart");
+    if (DEBUG) PrintToServer("[zm] OnMapStart");
     g_iLockedDoor = SAFEROOM_UNKNOWN;
     if (!g_bCvarAllow) return;
-	zm_new_round(false,true);
+	//zm_new_round();
 	ZM_menu = null;
 	zm_menu_IsOpen = false;
 	//ZM_finale_announced = false;
@@ -2513,7 +2517,7 @@ public void OnMapStart()
 
 public void OnMapEnd()
 {
-	PrintToServer("[zm] OnMapEnd");
+	if (DEBUG) PrintToServer("[zm] OnMapEnd");
 	zm_started = false;
 	if (ZM_menu!=null) ZM_menu.Cancel();
 	g_iLockedDoor = SAFEROOM_UNKNOWN; // we don't know if there's gonna be a door next map
@@ -2524,7 +2528,7 @@ public void OnMapEnd()
 void CountAliveSurvivors()
 {
 	if (!g_bCvarAllow) return;
-	PrintToServer("[zm] CountAliveSurvivors");
+	if (DEBUG) PrintToServer("[zm] CountAliveSurvivors");
 	int iPlayersInAliveSurvivors=0;
 	for (int i = 1; i <= MaxClients; i++)
 	{
@@ -2549,7 +2553,7 @@ void CountAliveSurvivors()
 
 void ResetTimer()
 {
- PrintToServer("[zm] ResetTimer");
+ if (DEBUG) PrintToServer("[zm] ResetTimer");
  delete zm_timer;
 }
 
@@ -2560,7 +2564,7 @@ public void OnConfigsExecuted()
 {
 	//g_hCvarMPGameMode.GetString(g_sCvarMPGameMode, sizeof(g_sCvarMPGameMode));
 	//LoadData();
-    PrintToServer("[zm] OnConfigsExecuted");
+    if (DEBUG) PrintToServer("[zm] OnConfigsExecuted");
 	IsAllowed();
 
 	//g_bConfigsExecuted = true;
@@ -2574,7 +2578,7 @@ public void OnConfigsExecuted()
 
 void PanicEventStarted(Event event, const char[] name, bool dontBroadcast)
 {
-	PrintToServer("[zm] PanicEventStarted");
+	if (DEBUG) PrintToServer("[zm] PanicEventStarted");
 	if (zm_started)
     {
         bank += g_iBonusCarAlarm;
@@ -2587,7 +2591,7 @@ void PanicEventStarted(Event event, const char[] name, bool dontBroadcast)
 void evtRoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
 	
-	PrintToServer("[zm] evtRoundEnd");
+	if (DEBUG) PrintToServer("[zm] evtRoundEnd");
 	g_iLockedDoor = SAFEROOM_UNKNOWN;
 	saferoom_locked = false;
 	//for( int i = 1; i <= MaxClients; i++ )
@@ -2602,11 +2606,11 @@ void evtRoundEnd(Event event, const char[] name, bool dontBroadcast)
 
 void evtRoundStart(Event event, const char[] name, bool dontBroadcast)
 {
-	PrintToServer("[zm] evtRoundStart");
+	if (DEBUG) PrintToServer("[zm] evtRoundStart");
 	g_iLockedDoor = SAFEROOM_UNKNOWN;
 	saferoom_locked = false;
 	if (ZM_menu!=null) ZM_menu.Cancel();
-	zm_new_round(true,false);
+	zm_new_round();
 	//toggle_panic(false,true); //set panic to false, override
 }
 
@@ -2614,7 +2618,7 @@ void Event_SurvivalRoundStart(Event event, const char[] name, bool dontBroadcast
 {
 	
 	if (!g_bCvarAllow) return;
-	PrintToServer("[zm] Event_SurvivalRoundStart");
+	if (DEBUG) PrintToServer("[zm] Event_SurvivalRoundStart");
 	
 	//if (!zm_started)
 	//{
@@ -2644,7 +2648,7 @@ void Event_SurvivalRoundStart(Event event, const char[] name, bool dontBroadcast
 
 void IsAllowed()
 {
-	PrintToServer("[zm] IsAllowed");
+	if (DEBUG) PrintToServer("[zm] IsAllowed");
 	bool bCvarAllow = g_hCvarAllow.BoolValue;
 	//GetCvars();
 
@@ -2779,7 +2783,7 @@ void IsAllowed()
 
 public Action EvtFinaleEnding(Handle hEvent, char[] Name, bool dontBroastcast)
 {
-    PrintToServer("[zm] EvtFinaleEnding");
+    if (DEBUG) PrintToServer("[zm] EvtFinaleEnding");
     if (ZM_finale_announced) ZM_finale_ended = true;
     else PrintToServer("[zm] Finale ending before it started??? WHAT THE ACTUAL FUCK");
     return Plugin_Continue;
@@ -2796,7 +2800,7 @@ public Action EvtFinaleEnding(Handle hEvent, char[] Name, bool dontBroastcast)
 
 public Action Event_TriggeredCarAlarm(Handle hEvent, char[] Name, bool dontBroastcast)
 {
-    PrintToServer("[zm] Event_TriggeredCarAlarm");
+    if (DEBUG) PrintToServer("[zm] Event_TriggeredCarAlarm");
     if (zm_started)
     {
         bank += g_iBonusCarAlarm;
@@ -2810,7 +2814,7 @@ public Action Event_TriggeredCarAlarm(Handle hEvent, char[] Name, bool dontBroas
 
 void Event_PlayerDisconnect(Event event, char[] name, bool bDontBroadcast)
 {
-    PrintToServer("[zm] Event_PlayerDisconnect");
+    if (DEBUG) PrintToServer("[zm] Event_PlayerDisconnect");
     if (g_bCvarAllow)
     {
        int client = GetClientOfUserId(event.GetInt("userid"));
@@ -2831,7 +2835,7 @@ void Event_PlayerDisconnect(Event event, char[] name, bool bDontBroadcast)
 
 void evtPlayerSpawned(Event event, const char[] name, bool dontBroadcast)
 {
-    PrintToServer("[zm] evtPlayerSpawned");
+    if (DEBUG) PrintToServer("[zm] evtPlayerSpawned");
 	//int userid = event.GetInt("userid");
 	//int client = GetClientOfUserId(userid);
 
@@ -2862,7 +2866,7 @@ void evtPlayerSpawned(Event event, const char[] name, bool dontBroadcast)
 
 void evtPlayerTeam(Event event, const char[] name, bool dontBroadcast)
 {
-	PrintToServer("[zm] evtPlayerTeam");
+	if (DEBUG) PrintToServer("[zm] evtPlayerTeam");
 	if (g_bCvarAllow)
     {
        int client = GetClientOfUserId(event.GetInt("userid"));
@@ -2895,12 +2899,12 @@ public Action L4D_OnFirstSurvivorLeftSafeArea(int client)
 public void OnClientPutInServer(int client)
 {
 	if(!g_bCvarAllow) return;
-	PrintToServer("[zm] OnClientPutInServer");
+	if (DEBUG) PrintToServer("[zm] OnClientPutInServer");
 	
 	if (!IsFakeClient(client))
 	{
     	t_last_join = GetEngineTime();
-    	PrintToServer("[zm] t_last_join updated");
+    	if (DEBUG) PrintToServer("[zm] t_last_join updated");
     	if (!zm_started && !zm_can_start) can_zm_start();
     	
 	}
@@ -2923,7 +2927,7 @@ public void OnClientDisconnect(int client)
 {
 	if (g_bCvarAllow)
 	{
-	   PrintToServer("[zm] OnClientDisconnect");
+	   if (DEBUG) PrintToServer("[zm] OnClientDisconnect");
 	   UpdateLiveSI();
        CountAliveSurvivors();
        if (zm_client==client)
@@ -2972,7 +2976,7 @@ public void OnEntityDestroyed(int entity)
 	if (zm_started || zm_deleted)
 	{
 	   int max_health = GetEntProp(entity,Prop_Data,"m_iMaxHealth");
-	   PrintToServer("[zm] OnEntityDestroyed MaxHP %d", max_health);
+	   if (DEBUG) PrintToServer("[zm] OnEntityDestroyed MaxHP %d", max_health);
 	   if (max_health && max_health>0)
 	   {
     	   int health = GetEntProp(entity,Prop_Data,"m_iHealth");
@@ -3037,7 +3041,7 @@ Handle g_hSDKGetName;
 GameData hGameData;
 void GetGameData()
 {
-	PrintToServer("[zm] GetGameData");
+	if (DEBUG) PrintToServer("[zm] GetGameData");
 	hGameData = LoadGameConfigFile(GAMEDATA_FILE);
 	if( hGameData != null )
 	{
@@ -3330,4 +3334,5 @@ Address RelativeJumpDestination(Address p)
 
 // Made for the Knockout.chat community
 // HUGE THANKS TO TESTERS: IronBar, ngh, Hatsune Miku Fan, Raykeno, Lil Ole Fella, ShaunOfTheLive
+// Chance, Skerion
 // HUGE THANKS TO Reagy and IronBar for hosting the Knockout Left 4 Dead 2 Server
