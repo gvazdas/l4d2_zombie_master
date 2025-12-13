@@ -3,6 +3,6 @@ Replace Valve's AI director with a spectating player, the zombie master, in Coop
 
 WIP. Not ready for public release yet.
 
-If you have questions or would like to join the playtester announcements contact me here:
+If you have questions or would like to join the playtester channel contact me here:
 https://steamcommunity.com/id/gvazdass
 https://knockout.chat/user/3022
