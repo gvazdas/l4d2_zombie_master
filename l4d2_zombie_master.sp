@@ -180,14 +180,14 @@ bool saferoom_locked = false;
 bool zm_can_start = false;
 float t_last_join = 0.0;
 
+// For zm_client always use EntRefToEntIndex
+// Should pass userid instead
+
 stock bool IsValidEntRef(int entity)
 {
-	//if( entity && entity != -1 && EntRefToEntIndex(entity) != INVALID_ENT_REFERENCE )
-	//	return true;
-	//return false;
-	if( !entity || entity<0 || EntRefToEntIndex(entity) == INVALID_ENT_REFERENCE )
-	   return false;
-    return true;
+	if( entity && entity != -1 && EntRefToEntIndex(entity) != INVALID_ENT_REFERENCE )
+		return true;
+	return false;
 		
 }
 
@@ -436,10 +436,13 @@ if (ZM_finale_announced) ZM_finale_ended = true;
 else PrintToServer("[zm] Rescue vehicle sent before Finale start. WHAT THE ACTUAL FUCK");
 }
 
+// Check if player is a valid actual player on the server
 bool IsValidClientZM(int client=-1)
 {
     if (client<0) client = zm_client;
-    return IsValidEntRef(client) && client>=0 && IsClientInGame(client);
+    if (client>0 && IsClientInGame(client) && !IsFakeClient(client) && !IsClientSourceTV(client) && !IsClientReplay(client))
+       return true;
+    return false;
 }
 
 void announce_finale()
@@ -1146,7 +1149,7 @@ public void OnPluginStart()
     g_hBonusFinaleStage = CreateConVar("zm_bonus_finale", "475", "ZM bank reward per player for advancing to the next Finale stage. A tank usually spawns too!",FCVAR_NOTIFY, true, 0.0, true, 10000.0);
     g_hBonusFinaleStage.AddChangeHook(ConVarChanged_Cvars);
     
-    g_hLockSaferoom = CreateConVar("zm_lock_saferoom", "0", "Lock saferoom until player join activity has cooled down and ZM is present. Survivors will be frozen if there is no saferoom.",FCVAR_NOTIFY, true, 0.0, true, 1.0);
+    g_hLockSaferoom = CreateConVar("zm_lock_saferoom", "1", "Lock saferoom until player join activity has cooled down and ZM is present. Survivors will be frozen if there is no saferoom.",FCVAR_NOTIFY, true, 0.0, true, 1.0);
     g_hLockSaferoom.AddChangeHook(ConVarChanged_Cvars);
     
     g_hStopInactivity = CreateConVar("zm_inactivity", "120.0", "Seconds of inactivity before the ZM is replaced. 0 to disable.",FCVAR_NOTIFY, true, 0.0, true, 10000000.0);
@@ -1795,7 +1798,7 @@ void ZM_Horde(int client, int count=10)
 	CountCommons(false);
 	g_iEntities = GetEntityCountEx();
 	
-	if((live_commons+count)>=g_iMaxCommons || (g_iEntities+count)>=ENTITY_SAFER_LIMIT)
+	if((live_commons+count)>g_iMaxCommons || (g_iEntities+count)>=ENTITY_SAFER_LIMIT)
 	{
 	   //PrintHintText(zm_client, "Limit reached.");
 	   update_hint("Limit reached."); 
@@ -2100,6 +2103,7 @@ void ZM_Spawn_SI(int client, int ZOMBIECLASS)
 	update_t_zm_activity();
 	
 	// spawn random area inside navmesh to avoid getting stuck
+	// take maximum 10.0 distance and look if there's an area there
 	
 	int cost_SI = costs_SI[ZOMBIECLASS];
 	if ((bank-cost_SI)<0)
