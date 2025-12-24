@@ -172,7 +172,35 @@
 					"offset"	"7"
 				}
 			}
+			
+			"CZombieManager"
+            {
+            "windows"
+            {
+            "signature" "InstallBotControl"	
+            "read" "2"
+            }
+            "linux"
+            {
+            "signature" "TheZombieManager"
+            }
+            "read" "0"
+            }
+			
 		}
+		
+		"Functions"
+		{
+			"ZM::CTerrorPlayer::StartRangeCull"
+			{
+				"signature"		"CTerrorPlayer::StartRangeCull"
+				"callconv"		"thiscall"
+				"return"		"void"
+				"this"			"entity"
+			}
+		
+		}
+		
 		"Signatures"
 		{
 			"FlashLightTurnOn"
@@ -238,6 +266,27 @@
 				"linux"	"@_Z22NextBotCreatePlayerBotI4TankEPT_PKc"
 				"mac"		"@_Z22NextBotCreatePlayerBotI4TankEPT_PKc"
 			}
+			
+			/*
+            * CTerrorPlayer::CullZombie(void)
+            */
+            "CullZombie"
+            {
+            "library"	"server"
+            "linux"	"@_ZN13CTerrorPlayer10CullZombieEv"
+            "windows" "\x83\xEC\x2A\x56\x8B\xF1\x8B\x0D\x2A\x2A\x2A\x2A\x57\x56\xE8\x2A\x2A\x2A\x2A\xB0\x2A\x8D\xBE"
+            /* 83 EC ? 56 8B F1 8B 0D ? ? ? ? 57 56 E8 ? ? ? ? B0 ? 8D BE */
+            }
+            
+            "CTerrorPlayer::StartRangeCull"
+			{
+				"library"		"engine"
+				"linux"			"@_ZN13CTerrorPlayer14StartRangeCullEv"
+				"windows"		"\x56\x8B\xF1\xE8\x2A\x2A\x2A\x2A\x83\xF8\x03\x75\x2A\x8B\x06\x8B\x90\x40\x05\x00\x00\x8B\xCE\xFF\xD2\x83\xF8\x08"
+								// 56 8B F1 E8 ? ? ? ? 83 F8 03 75 ? 8B 06 8B 90 40 05 00 00 8B CE FF D2 83 F8 08
+								// Search convar "z_cull_timeout"
+			}
+			
 		}
 
 		"Offsets"
