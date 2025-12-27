@@ -191,7 +191,7 @@
 		
 		"Functions"
 		{
-			"ZM::CTerrorPlayer::StartRangeCull"
+			"l4d2_zombie_master::CTerrorPlayer::StartRangeCull"
 			{
 				"signature"		"CTerrorPlayer::StartRangeCull"
 				"callconv"		"thiscall"
@@ -280,7 +280,7 @@
             
             "CTerrorPlayer::StartRangeCull"
 			{
-				"library"		"engine"
+				"library"		"server"
 				"linux"			"@_ZN13CTerrorPlayer14StartRangeCullEv"
 				"windows"		"\x56\x8B\xF1\xE8\x2A\x2A\x2A\x2A\x83\xF8\x03\x75\x2A\x8B\x06\x8B\x90\x40\x05\x00\x00\x8B\xCE\xFF\xD2\x83\xF8\x08"
 								// 56 8B F1 E8 ? ? ? ? 83 F8 03 75 ? 8B 06 8B 90 40 05 00 00 8B CE FF D2 83 F8 08
