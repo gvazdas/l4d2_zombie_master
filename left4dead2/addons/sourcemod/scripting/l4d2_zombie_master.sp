@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.34 2026-07-03"
+#define PLUGIN_VERSION 			"0.9.34a 2026-07-05"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -81,8 +81,11 @@ public Plugin myinfo =
 
 // Changelog for 0.9.4
 // 1. Riot cost to 50
-// 2. Fix re1 maps - start and end saferoom may be the same one.
+// 2. Fix re1 maps - fix softlock when start and end saferoom are the same one.
 // 3. New cvar: zm_enable_control
+// 4. New cvar: zm_cost_riot 50
+// 5. New cvar: zm_cost_angry 25
+// 6. Better Fallen Survivor logic.
 
 // TO DO LIST:
 // 15. Performance bottlenecks.
@@ -96,7 +99,7 @@ public Plugin myinfo =
 // 52. Smoker, Charger stupid behavior after ability fail.
 // 57. Frozen tanks should be in stasis to prevent music // EFL_DORMANT Entity_Flags
 // 58. Autokill obstructed stuck units
-// 60. Survivors still keep teleporting and falling to their death.
+// 60. Survivors teleport and fall to their death.
 // 62. Fun command: z_mute_infected no yelling or growling, allowing to stealth attack survivors.
 // 64. Crouched frozen specials should stay crouched.
 
@@ -376,10 +379,20 @@ public void OnPluginStart()
 	g_hNoZMWarn = CreateConVar("zm_nozm_warning", "1.0", "Warn players when there is no ZM.",FCVAR_PROTECTED, true, 0.0, true, 1.0);
 	
 	g_hCursed = CreateConVar("zm_cursed", "0", "Enable dumb stuff.",FCVAR_PROTECTED, true, 0.0, true, 1.0);
+    
     g_hJumpscare = CreateConVar("zm_enable_jumpscare", "0", "Enable audio jumpscare.",FCVAR_PROTECTED, true, 0.0, true, 1.0);
+    g_hJumpscare.AddChangeHook(ConVarChanged_Cvars_ZMenu);
+
     g_hGnome = CreateConVar("zm_enable_gnome", "1", "Gnome effect from the ZM weapons menu. 0 = off, 1 = all alive survivors, 2 = only survivors holding a gnome.",FCVAR_PROTECTED, true, 0.0, true, 2.0);
 
     g_hCvarControl = CreateConVar("zm_enable_control", "1", "Allow ZM to control Special Infected.",FCVAR_PROTECTED, true, 0.0, true, 1.0);
+    g_hCvarControl.AddChangeHook(ConVarChanged_Cvars_ZMenu);
+
+    g_hCostRiot = CreateConVar("zm_cost_riot", "50", "Cost of riot uncommons. -1 to disable.",FCVAR_PROTECTED, true, -1.0, true, 10000.0);
+    g_hCostRiot.AddChangeHook(ConVarChanged_Cvars_ZMenu);
+    
+    g_hCostAngry = CreateConVar("zm_cost_angry", "25", "Additive cost to make common infected chase survivors. -1 to disable.",FCVAR_PROTECTED, true, -1.0, true, 10000.0);
+    g_hCostAngry.AddChangeHook(ConVarChanged_Cvars_ZMenu);
 
     // r_screenoverlay is cheat-flagged by default; strip the flag so the gnome
     // effect can push a per-client overlay without sv_cheats.
@@ -410,6 +423,9 @@ public void OnPluginStart()
     //for (int i = 1; i <= MaxClients; i++)
     //    if (IsClientInGame(i)) SDKHook(i, SDKHook_OnTakeDamage, TrapTornado_OnTakeDamage);
     PvsForce_Init();
+
+    g_hMaxFallen = FindConVar("z_fallen_max_count"); // how many fallen are allowed
+    g_hMaxFallen.AddChangeHook(ConVarChanged_Cvars_ZMenu);
 }
 
 public void OnAdminMenuReady(Handle aTopMenu)
@@ -839,6 +855,7 @@ Action zm_update(Handle timer = null)
    }
    live_zombie_arr[ZOMBIECLASS_WITCH] = counted_witches; 
    
+   // Automatically create a small number of common infected for scripted panic events if the ZM can't.
    if ( (panic || L4D_IsSurvivalMode() || ZM_finale_announced) && live_zombie_arr[ZOMBIECLASS_TANK]<=0
        && zm_stage==ZM_STARTED && !manual_panic && g_iCostCommon<0 && g_iCostUncommon<0
        && script_CommonLimit>0 && max_zombie_arr[ZOMBIECLASS_COMMON]>0 )
@@ -1108,8 +1125,8 @@ Action zm_new_round(Handle timer = null)
    		if (IsValidEntity(entity)) AcceptEntityInput(entity, "Kill");
    	}
 	
-	fallen_spawned = false;
 	jimmy_spawned = false;
+    fallen_spawned = false;
 	
 	zm_menu_state = ZM_MENU_CLOSED;
 	RequestFrame(update_menus);
@@ -2442,7 +2459,6 @@ public void OnClientDisconnect(int client)
     
 }
 
-// Refund zombie delete
 public void OnGameFrame()
 {
     if (Trap_CountActive(ZM_TRAP_TYPE_TORNADO) == 0) return; // self-gate: no work unless a tornado is active
@@ -2473,12 +2489,10 @@ public void OnEntityDestroyed(int entity)
        	  
        	  if (strcmp(class,"infected")==0)
        	  {
-      	     if (refund)
+      	     if (refund && strncmp(targetName,"zm_unit",7,false)==0)
       	     {
-          	     if (strcmp(targetName,"zm_unit_common")==0 || strcmp(targetName,"zm_unit")==0)
-              	     bank_refund = g_iCostCommon;
-          	     else if (strcmp(targetName,"zm_unit_uncommon")==0)
-              	     bank_refund = g_iCostUncommon;
+          	     if (IsValidEdict(entity)) bank_refund = g_iCostList[entity];
+                 else bank_refund = calculate_infected_cost(GetEntProp(entity,Prop_Send,"m_Gender"));
       	         add_available_zombie(ZOMBIECLASS_COMMON,1);
   	         }
    	      }

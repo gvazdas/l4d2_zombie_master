@@ -349,7 +349,7 @@ void create_uncommon_menu()
     AddMenuItem(menu_uncommon, "item_1", buffer);
 
     if (valid_uncommon(g_sForceCommon) && strcmp(g_sForceCommon,"riot")!=0) buffer = "-";
-    else if (g_iCostUncommon>=0) Format(buffer,sizeof(buffer),"%T %d", "Riot", zm_language, g_iCostUncommon);
+    else if (g_iCostUncommon>=0 && g_hCostRiot.IntValue>=0) Format(buffer,sizeof(buffer),"%T %d", "Riot", zm_language, g_hCostRiot.IntValue);
     else buffer = "-";
     AddMenuItem(menu_uncommon, "item_2", buffer);
     
@@ -373,9 +373,9 @@ void create_uncommon_menu()
     else buffer = "-";
     AddMenuItem(menu_uncommon, "item_6", buffer);
     
-    if (!panic && !L4D_IsSurvivalMode() && !ZM_finale_announced && g_iCostUncommon>=0)
+    if (!panic && !L4D_IsSurvivalMode() && !ZM_finale_announced && g_hCostAngry.IntValue>=0)
     {
-        if (g_iCostCommon>=0 && !valid_uncommon(g_sForceCommon)) Format(buffer,sizeof(buffer),"%T %d", "Angry", zm_language, g_iCostUncommon);
+        if (g_iCostCommon>=0 && !valid_uncommon(g_sForceCommon)) Format(buffer,sizeof(buffer),"%T %d", "Angry", zm_language, g_hCostAngry.IntValue);
         else Format(buffer,sizeof(buffer),"%T %d", "Angry", zm_language, 2*g_iCostUncommon);
     }
     else buffer = "-";
@@ -497,7 +497,7 @@ void create_special_menu()
     else buffer = "-";
     AddMenuItem(menu_special, "item_7", buffer);
 
-    if (g_hCvarControl) Format(buffer, sizeof(buffer), "%T", "Control (USE)", zm_language);
+    if (g_hCvarControl.BoolValue) Format(buffer, sizeof(buffer), "%T", "Control (USE)", zm_language);
     else buffer = "-";
     buffer_add_rawline(buffer);
     AddMenuItem(menu_special, "item_8", buffer);
@@ -581,7 +581,7 @@ void create_boss_menu()
     AddMenuItem(menu_boss, "item_4", buffer);
     
     if (valid_uncommon(g_sForceCommon) && strcmp(g_sForceCommon,"fallen")!=0) buffer = "-";
-    else if (fallen_spawned || g_iCostUncommon<0 || max_zombie_arr[ZOMBIECLASS_COMMON]<=0) buffer = "-";
+    else if (fallen_spawned || g_iLiveFallen>=g_hMaxFallen.IntValue || g_iCostUncommon<0 || max_zombie_arr[ZOMBIECLASS_COMMON]<=0) buffer = "-";
     else Format(buffer, sizeof(buffer), "%T %d", "Fallen Survivor", zm_language,g_iCostUncommon);
     buffer_add_rawline(buffer);
     AddMenuItem(menu_boss, "item_5", buffer);
@@ -601,7 +601,7 @@ int boss_menu_Handler(Menu menu, MenuAction action, int param1, int param2)
             	case 1: ZM_Witch(zm_client,WITCH_STATIC);
             	case 2: ZM_Tank(zm_client,0);
             	case 3: { if (!jimmy_spawned) ZM_Horde(zm_client,1,"jimmy"); }
-            	case 4: { if (!fallen_spawned) ZM_Horde(zm_client,1,"fallen"); }
+            	case 4: ZM_Horde(zm_client,1,"fallen");
             	default: zm_menu_state=ZM_MENU_MAIN;
         	}
         	RequestFrame(reopen_zm_menu,true);

@@ -152,7 +152,7 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 	   if (hint) update_hint("%T", "Limit reached", zm_client);
 	   return;
     }
-    
+
     if (IsValidClientZM()) update_t_zm_activity();
 
 	static char type[16];
@@ -170,35 +170,28 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 	if (g_iCostCommon<0 && (type[0]==0 || strcmp(type,"",false)==0)) type = "random"; // commons disabled -> can only spawn uncommons
 	else if ( (type[0]!=0 || strcmp(type,"",false)!=0) && g_iCostUncommon<0) strcopy(type,sizeof(type), ""); // uncommons disabled -> can only spawn commons
 	
-	if (strcmp(type,"jimmy",false)==0)
+	int temp_gender = label_to_gender(type);
+
+	if (temp_gender==TYPE_JIMMY_GIBBS)
 	{
     	if (jimmy_spawned && !force_type) return;
     	if (!force_type) count = 1;
 	}
-	else if (strcmp(type,"fallen",false)==0)
+	else if (temp_gender==TYPE_FALLEN)
    	{
-       	if (fallen_spawned && !force_type) return;
-       	if (!force_type) count = 1;
+		int max = g_hMaxFallen.IntValue - g_iLiveFallen;
+		if (max<=0)
+		{
+			if (hint) update_hint("%T", "Limit reached", zm_client);
+			return;
+		}
+		if (count>max) count = max;
    	}
-   	
-   	TrimString(type);
+
+	angry = (angry && g_hCostAngry.IntValue>=0) || panic; // Will we chase survivors?
+	bool price_angry = angry && ( !panic && !ZM_finale_announced && !L4D_IsSurvivalMode() ); // Will chasing be expensive?
 	
-	int temp_cost = -1;
-	bool price_angry = angry && ( !panic && !ZM_finale_announced && !L4D_IsSurvivalMode() );
-	switch (price_angry)
-	{
-       	case false: // Not angry - regular price
-       	{
-           	if (type[0]!=0) temp_cost = g_iCostUncommon;
-           	else temp_cost = g_iCostCommon;
-       	}
-       	default: // Angry - more expensive. Doubly more expensive if angry uncommon.
-       	{
-           	if (type[0]!=0) temp_cost = 2*g_iCostUncommon;
-           	else if (g_iCostCommon>=0) temp_cost = g_iCostUncommon; // disables aggro common if commons are disabled
-       	}
-	}
-	
+	int temp_cost = calculate_infected_cost(temp_gender,price_angry);
 	if (temp_cost<0)
 	{
     	if (hint) update_hint("%T", "Limit reached", zm_client);
@@ -214,8 +207,6 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
        	return;
 	}
 
-	angry = angry || panic;
-
 	// Resolve spawn positions via provider
 	static float resolvedPositions[1500]; // 500 * 3 flat
 	int posCount = Spawner_ResolveCommonPositions(count,flow,angry,hint,resolvedPositions,500);
@@ -228,13 +219,8 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
     }
 
 	int spawned = 0;
-	float randomPos[3], angle[3];
-	bool glow, random;
-
+	static float randomPos[3], angle[3];
 	static char set_model[PLATFORM_MAX_PATH];
-	strcopy(set_model,sizeof(set_model), "")
-	if (strcmp(type,"random")==0) random = true;
-    else if (g_bClownGlow && strcmp(type,"clown")==0) glow = true;
     
     int target_client = -1;
     if (angry && !flow && IsValidClientZM()) target_client = get_spawner_target_survivor(flow);
@@ -246,22 +232,35 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 		randomPos[1] = resolvedPositions[idx+1];
 		randomPos[2] = resolvedPositions[idx+2];
 
-        if (!angry) get_random_xy_orientation(angle);
+		temp_gender = label_to_gender(type);
+		temp_cost = calculate_infected_cost(temp_gender,price_angry);
+		if (temp_cost<0)
+		{
+			if (hint) update_hint("%T", "Limit reached", zm_client);
+			return;
+		}
+		if (temp_cost>bank)
+		{
+			if (hint && spawned<=0) update_hint("%T", "afford_common", zm_client);
+			return;
+		}
+
+		bool glow = g_bClownGlow && temp_gender==TYPE_CLOWN;
+		if (!angry) get_random_xy_orientation(angle);
 		int zombie = -1;
-		if (strcmp(type,"",false)!=0 && type[0]!=0 && type[0]!=' ') get_uncommon_model(type,set_model);
+		infected_gender_to_model(temp_gender,set_model);
 		if (strcmp(set_model,"",false)==0 || set_model[0]==0 || set_model[0]==' ') zombie = L4D_SpawnCommonInfected(randomPos,angle);
 		else
 		{
       		zombie = CreateEntityByName("infected");
       		if (zombie!=-1)
       		{
-          		if (random) glow = strcmp(set_model,MODEL_CLOWN)==0;
           		SetEntityModel(zombie,set_model);
           		TeleportEntity(zombie,randomPos,angle,NULL_VECTOR);
                 DispatchSpawn(zombie);
               	if (glow && !ZM_finale_announced && !L4D_IsSurvivalMode())
                   	CreateTimer(1.0,clown_check_rush,EntIndexToEntRef(zombie),TIMER_REPEAT|TIMER_FLAG_NO_MAPCHANGE);
-                if (strcmp(set_model,MODEL_FALLEN3,false)==0) SetEntProp(zombie,Prop_Send,"m_nBody",GetRandomInt(0,1));
+                if (temp_gender==TYPE_FALLEN) SetEntProp(zombie,Prop_Send,"m_nBody",GetRandomInt(0,1));
           	}
 		}
 		
@@ -287,6 +286,7 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
            else DispatchKeyValue(zombie, "targetname", "zm_unit_common");
            Spawner_NotifySpawned(zombie);
 		   SET_TRANSMIT_ALWAYS(zombie);
+		   g_iCostList[zombie] = temp_cost;
         }
         if ((GetEngineTime()-t_start)*1000.0>t_budget_ms) break;
     }
@@ -316,7 +316,8 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
     	    }
     	    else if (strcmp(type,"fallen")==0)
     	    {
-        	    fallen_spawned = true;
+        	    g_iLiveFallen += spawned;
+				fallen_spawned = true;
         	    create_boss_menu();
     	    }
 	    }
