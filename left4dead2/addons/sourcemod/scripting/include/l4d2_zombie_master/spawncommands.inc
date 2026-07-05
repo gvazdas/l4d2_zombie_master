@@ -156,17 +156,19 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
     if (IsValidClientZM()) update_t_zm_activity();
 
 	static char type[16];
-	strcopy(type,sizeof(type),type0);
-    
-    TrimString(type);
     bool force_type = false;
     if (valid_uncommon(g_sForceCommon))
     {
 		strcopy(type,sizeof(type),g_sForceCommon);
         force_type = true;
     }
-    else if (!valid_uncommon(type)) strcopy(type,sizeof(type), "");
-	
+    else
+	{
+		strcopy(type,sizeof(type),type0);
+		TrimString(type);
+		if (!valid_uncommon(type)) strcopy(type,sizeof(type), "");
+	}
+
 	if (g_iCostCommon<0 && (type[0]==0 || strcmp(type,"",false)==0)) type = "random"; // commons disabled -> can only spawn uncommons
 	else if ( (type[0]!=0 || strcmp(type,"",false)!=0) && g_iCostUncommon<0) strcopy(type,sizeof(type), ""); // uncommons disabled -> can only spawn commons
 	
@@ -180,7 +182,7 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 	else if (temp_gender==TYPE_FALLEN)
    	{
 		int max = g_hMaxFallen.IntValue - g_iLiveFallen;
-		if (max<=0)
+		if (max<=0 || fallen_spawned)
 		{
 			if (hint) update_hint("%T", "Limit reached", zm_client);
 			return;
@@ -249,7 +251,7 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 		if (!angry) get_random_xy_orientation(angle);
 		int zombie = -1;
 		infected_gender_to_model(temp_gender,set_model);
-		if (strcmp(set_model,"",false)==0 || set_model[0]==0 || set_model[0]==' ') zombie = L4D_SpawnCommonInfected(randomPos,angle);
+		if (temp_gender==TYPE_COMMON || set_model[0]==0) zombie = L4D_SpawnCommonInfected(randomPos,angle);
 		else
 		{
       		zombie = CreateEntityByName("infected");
@@ -905,7 +907,7 @@ int ZM_Spawn_SI(int client, int ZOMBIECLASS, bool free = false, bool setpos=fals
 
             if (IsValidClientZM())
             {
-                if (!zm_use_notify)
+                if (!zm_use_notify && g_hCvarControl.BoolValue)
                 {
                     update_hint("%T", "ZM control hint", zm_client);
                     if (IsValidClientZM()) PrintHintText(zm_client, "%t", "ZM control hint");

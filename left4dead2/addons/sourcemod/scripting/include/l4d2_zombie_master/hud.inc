@@ -5,6 +5,33 @@
 #define _zm_hud_included
 ///////////////////////////////////////
 
+#define HUD_TIMER                          0
+#define HUD_ZM                             1
+#define HUD_TICKER                         2
+#define HUD_ZM_HINT                        3
+
+#define HUD_FLAG_NONE                 0     // no flag
+#define HUD_FLAG_PRESTR               1     // do you want a string/value pair to start(pre) with the string (default is PRE)
+#define HUD_FLAG_POSTSTR              2     // do you want a string/value pair to end(post) with the string
+#define HUD_FLAG_BEEP                 4     // Makes a countdown timer blink
+#define HUD_FLAG_BLINK                8     // do you want this field to be blinking
+#define HUD_FLAG_AS_TIME              16    // ?
+#define HUD_FLAG_COUNTDOWN_WARN       32    // auto blink when the timer gets under 10 seconds
+#define HUD_FLAG_NOBG                 64    // dont draw the background box for this UI element
+#define HUD_FLAG_ALLOWNEGTIMER        128   // by default Timers stop on 0:00 to avoid briefly going negative over network, this keeps that from happening
+#define HUD_FLAG_ALIGN_LEFT           256   // Left justify this text
+#define HUD_FLAG_ALIGN_CENTER         512   // Center justify this text
+#define HUD_FLAG_ALIGN_RIGHT          768   // Right justify this text
+#define HUD_FLAG_TEAM_SURVIVORS       1024  // only show to the survivor team
+#define HUD_FLAG_TEAM_INFECTED        2048  // only show to the special infected team
+#define HUD_FLAG_TEAM_MASK            3072  // ?
+#define HUD_FLAG_UNKNOWN1             4096  // ?
+#define HUD_FLAG_TEXT                 8192  // ?
+#define HUD_FLAG_NOTVISIBLE           16384 // if you want to keep the slot data but keep it from displaying
+#define HUD_TEXT_ALIGN_LEFT           1
+#define HUD_TEXT_ALIGN_CENTER         2
+#define HUD_TEXT_ALIGN_RIGHT          3
+
 // To draw EMS HUD
 void enable_challenge_mode()
 {
@@ -45,7 +72,7 @@ Action perform_HUD_update(Handle timer = null)
     if (DEBUG) LogMessage("[zm] perform_HUD_update");
     
     GameRules_SetProp("m_iScriptedHUDFlags", HUD_FLAG_NOTVISIBLE, _, HUD_TICKER);
-    if (!g_bCvarAllow || !clients_in_server || L4D_IsInIntro()>0 || zm_stage>=ZM_END || !L4D_HasMapStarted())
+    if (!g_bCvarAllow || !clients_in_server || zm_stage>=ZM_END || L4D_IsInIntro()>0 || !L4D_HasMapStarted())
     {
         GameRules_SetProp("m_iScriptedHUDFlags", HUD_FLAG_NOTVISIBLE, _, HUD_TIMER);
         GameRules_SetProp("m_iScriptedHUDFlags", HUD_FLAG_NOTVISIBLE, _, HUD_ZM);
@@ -53,7 +80,7 @@ Action perform_HUD_update(Handle timer = null)
         return Plugin_Stop;
     }
 
-    char pad[128];
+    static char pad[128];
     if (g_bHudPerElement) pad[0] = '\0';
     else strcopy(pad, sizeof(pad), g_sSpaces);
 
@@ -68,7 +95,7 @@ Action perform_HUD_update(Handle timer = null)
     if (IsValidClientZM() && zm_stage<ZM_END)
     {
         
-        char panic_str[32];
+        static char panic_str[32];
         if (panic || ZM_finale_announced || (L4D_IsSurvivalMode() && zm_stage==ZM_STARTED) )
         {
             float panic_left;
@@ -87,10 +114,10 @@ Action perform_HUD_update(Handle timer = null)
         }
         else Format(panic_str, sizeof(panic_str), "");
         
-        char bank_str[32];
-        char common_str[32];
-        char special_str[32];
-        char witch_str[32];
+        static char bank_str[32];
+        static char common_str[32];
+        static char special_str[32];
+        static char witch_str[32];
         
         if (bank_rate>0.0) Format(bank_str, sizeof(bank_str), "%T %d (%.1f)", "Bank", zm_client, bank, bank_rate);
         else Format(bank_str, sizeof(bank_str), "%T %d", "Bank", zm_client, bank);

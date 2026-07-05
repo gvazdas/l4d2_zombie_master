@@ -34,11 +34,12 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.34a 2026-07-05"
+#define PLUGIN_VERSION 			"0.9.34b 2026-07-05"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
 #include <l4d2_zombie_master/zombie_master>
+#include <l4d2_zombie_master/infected>
 #include <l4d2_grid_lib>
 #include <l4d2_zombie_master/sdk>
 #include <l4d2_zombie_master/glow>
@@ -1353,6 +1354,7 @@ public void OnEntityCreated(int entity, const char[] classname)
         	if (live_zombie_arr[ZOMBIECLASS_COMMON]>0) return;
         	if (strcmp(classname,"infected",false)==0) CountCommons(null,false);
     	}
+        
     	//case 't':
     	//{
         //	if (specials_frozen && strcmp(classname,"tank",false)==0)
@@ -2471,37 +2473,32 @@ public void OnEntityDestroyed(int entity)
     
 	int max_health = GetEntProp(entity,Prop_Data,"m_iMaxHealth");
 	//if (DEBUG) LogMessage("[zm] OnEntityDestroyed MaxHP %d", max_health);
-	if (max_health && max_health>0)
+	if (max_health>0)
     {
-	      int health = GetEntProp(entity,Prop_Data,"m_iHealth");
-	      bool refund = (health>=max_health);
-	      
-          char targetName[32];
+          static char targetName[32];
           GetEntPropString(entity, Prop_Data, "m_iName", targetName, sizeof(targetName));
-          char class[32];
+          if (strncmp(targetName,"zm_unit",7,false)!=0) return; // Skip logic for non zombie master units
+
+          int health = GetEntProp(entity,Prop_Data,"m_iHealth");
+	      bool refund = (health>=max_health);
+
+          static char class[32];
           GetEntityClassname(entity, class, sizeof(class));
-          
-          // Check only for: zm units, spotted zm units, and infected
-          if ( !(strcmp(targetName,"zm_unit")==0 || strcmp(targetName,"zm_unit_spotted")==0 || strcmp(class,"infected")==0) )
-              return;
        	  
        	  int bank_refund = -1;
        	  
        	  if (strcmp(class,"infected")==0)
        	  {
-      	     if (refund && strncmp(targetName,"zm_unit",7,false)==0)
+      	     if (refund)
       	     {
-          	     if (IsValidEdict(entity)) bank_refund = g_iCostList[entity];
+          	     if (IsValidEdict(entity) && g_iCostList[entity]>0) bank_refund = g_iCostList[entity];
                  else bank_refund = calculate_infected_cost(GetEntProp(entity,Prop_Send,"m_Gender"));
-      	         add_available_zombie(ZOMBIECLASS_COMMON,1);
+                 add_available_zombie(ZOMBIECLASS_COMMON,1);
   	         }
    	      }
        	  else if (strcmp(class,"witch")==0)
        	  {
-       	     
-       	     if (strcmp(targetName,"zm_unit")!=0 && strcmp(targetName,"zm_unit_spotted")!=0 ) return;
        	     if (refund && strcmp(targetName,"zm_unit_spotted")==0) refund = false;
-       	     
        	     if (refund)
        	     {
        	         // Figuring out if witch is stationary or moving
@@ -2544,7 +2541,7 @@ public void OnEntityDestroyed(int entity)
                  if (ability > 0 && IsValidEdict(ability))
                  {
                      if ((GetEntPropFloat(ability, Prop_Send, "m_timestamp")-GetGameTime())>1.0) 
-                         refund = false;
+                        refund = false;
                  }
              }
 
