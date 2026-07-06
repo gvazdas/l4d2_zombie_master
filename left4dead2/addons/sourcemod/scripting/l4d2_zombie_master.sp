@@ -830,29 +830,26 @@ Action zm_update(Handle timer = null)
    t_last_update = t_now;
    
     // Check if witches were spotted to prevent refunds.
-    float witch_pos[3];
+    static float witch_pos[3];
     int entity = -1;
     int counted_witches = 0;
-    char targetName[20];
+    static char targetName[16];
     while ( ((entity = FindEntityByClassname(entity, "witch")) != -1) )
     {
-    	 if (!IsValidEntity(entity)) continue;
-    	 
-           if (GetEntProp(entity,Prop_Data,"m_iHealth")<=0) continue;	 
-    	   counted_witches += 1;
-           if (g_iGlowList[entity]==INVALID_ENT_REFERENCE) CreateZMGlow(entity);
-           GetEntPropString(entity, Prop_Data, "m_iName", targetName, sizeof(targetName));
-           if (strcmp(targetName,"zm_unit")==0)
-           {
-              GetEntPropVector(entity, Prop_Send, "m_vecOrigin", witch_pos);
-              if (can_any_alive_survivor_see_cheap(witch_pos))
-              {
-                 DispatchKeyValue(entity, "targetname", "zm_unit_spotted");
-                 update_hint("%T", "Witch sighted", zm_client);
-                 request_update_glow(entity);
-              }
-           
-           }
+        if (GetEntProp(entity,Prop_Data,"m_iHealth")<=0) continue;	 
+        counted_witches += 1;
+        if (g_iGlowList[entity]==INVALID_ENT_REFERENCE) CreateZMGlow(entity);
+        GetEntPropString(entity, Prop_Data, "m_iName", targetName, sizeof(targetName));
+        if (strcmp(targetName,"zm_unit")==0)
+        {
+            GetEntPropVector(entity, Prop_Send, "m_vecOrigin", witch_pos);
+            if (can_any_alive_survivor_see_cheap(witch_pos))
+            {
+                DispatchKeyValue(entity, "targetname", "zm_unit_spotted");
+                update_hint("%T", "Witch sighted", zm_client);
+                request_update_glow(entity);
+            }
+        }
    }
    live_zombie_arr[ZOMBIECLASS_WITCH] = counted_witches; 
    

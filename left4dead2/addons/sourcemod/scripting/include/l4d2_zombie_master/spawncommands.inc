@@ -155,6 +155,8 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 
     if (IsValidClientZM()) update_t_zm_activity();
 
+	if (g_hCostAngry.IntValue<0) angry = false;
+
 	static char type[16];
     bool force_type = false;
     if (valid_uncommon(g_sForceCommon))
@@ -176,8 +178,12 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 
 	if (temp_gender==TYPE_JIMMY_GIBBS)
 	{
-    	if (jimmy_spawned && !force_type) return;
-    	if (!force_type) count = 1;
+    	if (jimmy_spawned && !force_type)
+		{
+			if (hint) update_hint("%T", "Limit reached", zm_client);
+			return;
+		}
+		if (!force_type) count = 1;
 	}
 	else if (temp_gender==TYPE_FALLEN)
    	{
@@ -190,7 +196,7 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 		if (count>max) count = max;
    	}
 
-	angry = (angry && g_hCostAngry.IntValue>=0) || panic; // Will we chase survivors?
+	angry = angry || panic; // Will we chase survivors?
 	bool price_angry = angry && ( !panic && !ZM_finale_announced && !L4D_IsSurvivalMode() ); // Will chasing be expensive?
 	
 	int temp_cost = calculate_infected_cost(temp_gender,price_angry);

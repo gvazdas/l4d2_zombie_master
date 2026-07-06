@@ -148,7 +148,7 @@ void create_main_menu()
 	
 	int zm_language = LANG_SERVER;
 	if (IsValidClientZM()) zm_language = zm_client;
-	char buffer[64]; 
+	static char buffer[64]; 
 	
 	Format(buffer, sizeof(buffer), "%T", "Zombie Master", zm_language);
 	menu_main.SetTitle(buffer);
@@ -238,7 +238,7 @@ void create_common_menu()
 	
 	int zm_language = LANG_SERVER;
 	if (IsValidClientZM()) zm_language = zm_client;
-	char buffer[64]; 
+	static char buffer[64]; 
     	
     Format(buffer, sizeof(buffer), "%T", "Common", zm_language);
 	menu_common.SetTitle(buffer);
@@ -339,43 +339,45 @@ void create_uncommon_menu()
     
 	int zm_language = LANG_SERVER;
 	if (IsValidClientZM()) zm_language = zm_client;
-	char buffer[64]; 
+	static char buffer[64]; 
 	
 	Format(buffer, sizeof(buffer), "%T", "Uncommon", zm_language);
 	menu_uncommon.SetTitle(buffer);
     
-    if (g_iCostUncommon>=0) Format(buffer,sizeof(buffer),"%s %d", "Random", g_iCostUncommon);
+    bool b_ValidUncommon = valid_uncommon(g_sForceCommon);
+    
+    if (g_iCostUncommon>=0) Format(buffer,sizeof(buffer),"%s", "Random");
     else buffer = "-";
     AddMenuItem(menu_uncommon, "item_1", buffer);
 
-    if (valid_uncommon(g_sForceCommon) && strcmp(g_sForceCommon,"riot")!=0) buffer = "-";
+    if (b_ValidUncommon && strcmp(g_sForceCommon,"riot")!=0) buffer = "-";
     else if (g_iCostUncommon>=0 && g_hCostRiot.IntValue>=0) Format(buffer,sizeof(buffer),"%T %d", "Riot", zm_language, g_hCostRiot.IntValue);
     else buffer = "-";
     AddMenuItem(menu_uncommon, "item_2", buffer);
     
-    if (valid_uncommon(g_sForceCommon) && strcmp(g_sForceCommon,"ceda")!=0) buffer = "-";
+    if (b_ValidUncommon && strcmp(g_sForceCommon,"ceda")!=0) buffer = "-";
     else if (g_iCostUncommon>=0) Format(buffer,sizeof(buffer),"%T %d", "CEDA", zm_language, g_iCostUncommon);
     else buffer = "-";
     AddMenuItem(menu_uncommon, "item_3", buffer);
     
-    if (valid_uncommon(g_sForceCommon) && strcmp(g_sForceCommon,"clown")!=0) buffer = "-";
+    if (b_ValidUncommon && strcmp(g_sForceCommon,"clown")!=0) buffer = "-";
     else if (g_iCostUncommon>=0) Format(buffer,sizeof(buffer),"%T %d", "Clown", zm_language, g_iCostUncommon);
     else buffer = "-";
     AddMenuItem(menu_uncommon, "item_4", buffer);
    
-    if (valid_uncommon(g_sForceCommon) && strcmp(g_sForceCommon,"mud")!=0) buffer = "-";
+    if (b_ValidUncommon && strcmp(g_sForceCommon,"mud")!=0) buffer = "-";
     else if (g_iCostUncommon>=0) Format(buffer,sizeof(buffer),"%T %d", "Mud", zm_language, g_iCostUncommon);
     else buffer = "-";
     AddMenuItem(menu_uncommon, "item_5", buffer);
     
-    if (valid_uncommon(g_sForceCommon) && strcmp(g_sForceCommon,"road")!=0) buffer = "-";
+    if (b_ValidUncommon&& strcmp(g_sForceCommon,"road")!=0) buffer = "-";
     else if (g_iCostUncommon>=0) Format(buffer,sizeof(buffer),"%T %d", "Road", zm_language, g_iCostUncommon);
     else buffer = "-";
     AddMenuItem(menu_uncommon, "item_6", buffer);
     
-    if (!panic && !L4D_IsSurvivalMode() && !ZM_finale_announced && g_hCostAngry.IntValue>=0)
+    if (g_hCostAngry.IntValue>=0 && !panic && !ZM_finale_announced && !L4D_IsSurvivalMode())
     {
-        if (g_iCostCommon>=0 && !valid_uncommon(g_sForceCommon)) Format(buffer,sizeof(buffer),"%T %d", "Angry", zm_language, g_iCostCommon+g_hCostAngry.IntValue);
+        if (g_iCostCommon>=0 && !b_ValidUncommon) Format(buffer,sizeof(buffer),"%T %d", "Angry", zm_language, g_iCostCommon+g_hCostAngry.IntValue);
         else Format(buffer,sizeof(buffer),"%T %d", "Angry", zm_language, g_iCostUncommon+g_hCostAngry.IntValue);
     }
     else buffer = "-";
@@ -429,7 +431,7 @@ void create_special_menu()
     
     int zm_language = LANG_SERVER;
 	if (IsValidClientZM()) zm_language = zm_client;
-	char buffer[64]; 
+	static char buffer[64]; 
     int occupied, max;
     
     Format(buffer, sizeof(buffer), "%T", "Special", zm_language);
@@ -553,7 +555,7 @@ void create_boss_menu()
 	
 	int zm_language = LANG_SERVER;
 	if (IsValidClientZM()) zm_language = zm_client;
-	char buffer[64]; 
+	static char buffer[64]; 
 	
 	Format(buffer, sizeof(buffer), "%T", "Boss", zm_language);
 	menu_boss.SetTitle(buffer);
@@ -629,7 +631,7 @@ void create_traps_menu()
 
 	int zm_language = LANG_SERVER;
 	if (IsValidClientZM()) zm_language = zm_client;
-	char buffer[64];
+	static char buffer[64]; 
 
 	Format(buffer, sizeof(buffer), "%T", "Traps", zm_language);
 	menu_traps.SetTitle(buffer);
@@ -692,7 +694,7 @@ void create_cleanup_menu()
 	
 	int zm_language = LANG_SERVER;
     if (IsValidClientZM()) zm_language = zm_client;
-    char buffer[64]; 
+    static char buffer[64]; 
 	
 	Format(buffer, sizeof(buffer), "%T", "Cleanup", zm_language);
 	menu_cleanup.SetTitle(buffer);
@@ -754,7 +756,7 @@ void create_other_menu()
 	
 	int zm_language = LANG_SERVER;
     if (IsValidClientZM()) zm_language = zm_client;
-    char buffer[64]; 
+    static char buffer[64]; 
 	
 	Format(buffer, sizeof(buffer), "%T", "Other", zm_language);
 	menu_other.SetTitle(buffer);
@@ -1107,7 +1109,7 @@ void create_quit_menu()
 	menu_quit = CreateMenuEx(GetMenuStyleHandle(MenuStyle_Radio),quit_menu_Handler);
     apply_zm_menu_settings(menu_quit);
 
-    char buffer[64]; 
+    static char buffer[64]; 
     Format(buffer, sizeof(buffer), "%t ?", "Give Up", zm_client);
 	menu_quit.SetTitle(buffer);
 
@@ -1162,7 +1164,7 @@ void create_items_menu()
     
     menu_items.SetTitle("%t: %d", "Survivors", g_iAliveSurvivors, zm_language);
 
-    char buffer[64]; 
+    static char buffer[64]; 
     
     if (g_iMolotov>0) Format(buffer, sizeof(buffer), "%t: %d", "Molotov", g_iMolotov, zm_language);
     else buffer = "";
@@ -1239,7 +1241,7 @@ void create_weapons_menu()
     
     menu_weapons.SetTitle("%t: %d", "Survivors", g_iAliveSurvivors, zm_language);
 
-    char buffer[64];
+    static char buffer[64]; 
 
     if (g_iPistol>0) Format(buffer, sizeof(buffer), "%t: %d", "Pistol", g_iPistol, zm_language);
     else buffer = "";
