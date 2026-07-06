@@ -632,7 +632,7 @@ Action Timer_StartPrecomputeNav(Handle timer)
     }
     if (!start_known)
     {
-        LogMessage("WARNING: could not find start area");
+        LogMessage("WARNING: could not find start area -> zm prep disabled");
         return Plugin_Stop;
     }
 

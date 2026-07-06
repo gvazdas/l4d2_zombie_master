@@ -370,7 +370,7 @@ void create_uncommon_menu()
     else buffer = "-";
     AddMenuItem(menu_uncommon, "item_5", buffer);
     
-    if (b_ValidUncommon&& strcmp(g_sForceCommon,"road")!=0) buffer = "-";
+    if (b_ValidUncommon && strcmp(g_sForceCommon,"road")!=0) buffer = "-";
     else if (g_iCostUncommon>=0) Format(buffer,sizeof(buffer),"%T %d", "Road", zm_language, g_iCostUncommon);
     else buffer = "-";
     AddMenuItem(menu_uncommon, "item_6", buffer);

@@ -2834,7 +2834,8 @@ void JoinZM_Post(int client)
         CLIENT_GLOW_TRANSMIT_ALWAYS(i);
     }
 
-    set_zm_stage(ZM_PREP);
+    if (g_hStartAreaList.Length>0 || L4D_IsSurvivalMode()) set_zm_stage(ZM_PREP);
+    else if (zm_stage<ZM_STARTED) start_zm_round();
     GetClientAbsOrigin(zm_client, zm_deathPos);
     GetClientEyeAngles(zm_client, zm_deathAngles);
     //stop_sound(zm_client,true); // stops survivor-related sounds

@@ -13,10 +13,10 @@
 // Plugin authors: gvazdas, zyiks, Skerion
 // HUGE THANKS TO TESTERS: Hatsune Miku Fan (God's Strongest Playtester), Skerion, Raykeno, IronBar, ngh, Lil Ole Fella, ShaunOfTheLive, zyiks
 // Chance, Lett1, AGGA Lambo, Robotnik, AriesToffle, Shadowcat, Wicket, GARFIELD'S SKELETON, Perchance, 
-// Snake22, Mark9013100, Sarahtonin, Rex Bosworth, Sarah "NOTHING EVER HAPPENS" Tonin, g3intel, SomeENG, nativehenu
-// HUGE THANKS for scripting help: HarryPotter, xerox8521, Forgetest, little_froy, Lux, Marttt, Bacardi, Silvers, zyiks
+// Snake22, Mark9013100, Sarahtonin, Rex Bosworth, Sarah "NOTHING EVER HAPPENS" Tonin, g3intel, SomeENG, nativehenu, carex53, Captain Foxer, Sherly
+// HUGE THANKS for scripting help: HarryPotter, xerox8521, Forgetest, little_froy, Lux, Marttt, Bacardi, SilverShot, zyiks
 // HUGE THANKS TO Reagy and IronBar for hosting the Knockout Left 4 Dead 2 Server
-// Sentence-mixed survivor voice lines: Skerion (Ellis voice line by zyiks)
+// Sentence-mixed Survivor voice lines: Skerion (Ellis voice line by zyiks)
 
 #pragma semicolon 1
 #pragma newdecls required
@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.34b 2026-07-05"
+#define PLUGIN_VERSION 			"0.9.34c 2026-07-05"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -75,7 +75,7 @@ public Plugin myinfo =
 {
 	name = "[L4D2] Zombie Master",
 	author = "gvazdas, zyiks, Skerion",
-	description = "[coop,survival] An infected player, the Zombie Master, replaces the AI Director and must stop the Survivors.",
+	description = "[coop,survival] An infected player, the Zombie Master, controls the zombie horde instead of the AI Director.",
 	version = PLUGIN_VERSION,
 	url = "https://forums.alliedmods.net/showthread.php?t=352060, https://github.com/gvazdas/l4d2_zombie_master"
 }
