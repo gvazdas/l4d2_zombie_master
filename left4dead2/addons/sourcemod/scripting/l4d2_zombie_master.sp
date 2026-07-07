@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.34c 2026-07-05"
+#define PLUGIN_VERSION 			"0.9.34d 2026-07-06"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -2496,28 +2496,36 @@ public void OnEntityDestroyed(int entity)
        	  else if (strcmp(class,"witch")==0)
        	  {
        	     if (refund && strcmp(targetName,"zm_unit_spotted")==0) refund = false;
-       	     if (refund)
-       	     {
-       	         // Figuring out if witch is stationary or moving
-           	     int m_nSequence = GetEntProp(entity,Prop_Data,"m_nSequence");
-           	     if (m_nSequence==4 || m_nSequence==27)
-           	     {
-               	     bank_refund = g_iCostWitchStatic;
-               	     if (DEBUG) LogMessage("[zm] Refunding static witch");
-           	     }
-           	     else if (m_nSequence==10 || m_nSequence==11 || m_nSequence==2)
-           	     {
-               	     bank_refund = g_iCostWitchMoving;
-               	     if (DEBUG) LogMessage("[zm] Refunding moving witch");
-           	     }
-           	     if (bank_refund<0)
-           	     {
-               	     if (DEBUG) LogMessage("[zm] Refunding cheapest witch");
-               	     if (g_hCostWitchStatic<g_hCostWitchMoving) bank_refund=g_iCostWitchStatic;
-               	     else bank_refund=g_iCostWitchMoving;
-           	     }
-           	     add_available_zombie(ZOMBIECLASS_WITCH,1);
-       	     }
+       	     
+             if (refund)
+             {
+                if (IsValidEdict(entity) && g_iCostList[entity]>0)
+                {
+                    bank_refund = g_iCostList[entity];
+                }
+                else
+                {
+                    // Figuring out if witch is stationary or moving
+                    int m_nSequence = GetEntProp(entity,Prop_Data,"m_nSequence");
+                    if (m_nSequence==4 || m_nSequence==27)
+                    {
+                        bank_refund = g_iCostWitchStatic;
+                        if (DEBUG) LogMessage("[zm] Refunding static witch");
+                    }
+                    else if (m_nSequence==10 || m_nSequence==11 || m_nSequence==2)
+                    {
+                        bank_refund = g_iCostWitchMoving;
+                        if (DEBUG) LogMessage("[zm] Refunding moving witch");
+                    }
+                    if (bank_refund<0)
+                    {
+                        if (DEBUG) LogMessage("[zm] Refunding cheapest witch");
+                        if (g_hCostWitchStatic<g_hCostWitchMoving) bank_refund=g_iCostWitchStatic;
+                        else bank_refund=g_iCostWitchMoving;
+                    }
+                }
+                add_available_zombie(ZOMBIECLASS_WITCH,1);
+             }
        	     else
        	     {
            	     create_timer_add_available_zombie(g_fWitchCooldown,ZOMBIECLASS_WITCH,roundcount);

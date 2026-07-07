@@ -423,6 +423,7 @@ void ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
            	SetEntPropFloat(witch,Prop_Send,"m_flModelScale",GetRandomFloat(0.5,2.0));
            	ChangeEdictState(witch);
        	}
+		g_iCostList[witch] = temp_cost;
 	}
 	else update_hint("%T", "Spawn failed", zm_client);
 
