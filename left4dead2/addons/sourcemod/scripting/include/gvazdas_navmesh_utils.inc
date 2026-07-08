@@ -10,6 +10,7 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // v1.01 -- improved constrained logic
+// v1.02 -- added navmesh_clip
 
 #if defined _gvazdas_navmesh_utils_inc_included
  #endinput
@@ -70,6 +71,18 @@ stock bool navmesh_OOB(const Address navArea, float pos[3], const bool z = true)
     if (z && pos[2]<L4D_NavArea_GetZ(navArea,pos)) return true;
     static float mins[3], maxs[3]; get_center_size_mins_maxs(center,size,mins,maxs);
     return pos_OOB(pos,mins,maxs,false);
+}
+
+// clip_xy for navmesh
+stock void navmesh_clip(const Address navArea, float pos[3])
+{
+    if (navArea == Address_Null) return;
+    static float center[3],size[3];
+    L4D_GetNavAreaCenter(navArea,center);
+    L4D_GetNavAreaSize(navArea,size); AbsoluteVector(size);
+    static float mins[3], maxs[3]; get_center_size_mins_maxs(center,size,mins,maxs);
+    clip_xy(pos,mins,maxs);
+    pos[2] = L4D_NavArea_GetZ(navArea,pos);
 }
 
 // get mins and maxs for given center and abs size

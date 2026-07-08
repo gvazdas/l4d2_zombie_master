@@ -87,6 +87,7 @@ public Plugin myinfo =
 // 4. New cvar: zm_cost_riot 50
 // 5. New cvar: zm_cost_angry 25
 // 6. Better Fallen Survivor logic.
+// 7. More robust refund logic for common infected and witches.
 
 // TO DO LIST:
 // 15. Performance bottlenecks.

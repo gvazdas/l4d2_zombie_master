@@ -396,7 +396,7 @@ void ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
 	if (witch_type==WITCH_STATIC) SetConVarInt(FindConVar("sv_force_time_of_day"),0);
 	else SetConVarInt(FindConVar("sv_force_time_of_day"),3);
 
-	float angle[3];
+	static float angle[3];
 	get_random_xy_orientation(angle);
 
 	int witch;

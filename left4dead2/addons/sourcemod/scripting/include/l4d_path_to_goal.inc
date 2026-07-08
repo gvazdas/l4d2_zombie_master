@@ -1927,8 +1927,8 @@ stock bool explore_stitch(ArrayList cells, int &i_start, int max_steps = 50)
     return success;
 }
 
-// Add cell to cells. If there is no LOS, attempt rescue.
-void guide_add_cell(ArrayList cells, Cell cell)
+// Add cell to cells. If there is no LOS, attempt rescue. If check_ladder, add ladder mounting points.
+void guide_add_cell(ArrayList cells, Cell cell, bool check_ladder = true)
 {
     if (cells.Length<1) // no shortcuts available
     {
@@ -1937,13 +1937,6 @@ void guide_add_cell(ArrayList cells, Cell cell)
     }
     static Cell cell_prev, cell_prev2;
     cells.GetArray(cells.Length-1,cell_prev,sizeof(Cell)); // last cell
-
-    //int ladder = ladder_from_to(cell_prev.navArea,cell.navArea);
-    //if (ladder>0)
-    //{
-    //    LogMessage("guide_add_cell ladder %d", ladder);
-    //    //static Cell cell_ladder;
-    //}
     
     bool prev2 = cells.Length>=2;
     if (prev2) cells.GetArray(cells.Length-2,cell_prev2,sizeof(Cell));
@@ -1976,6 +1969,36 @@ void guide_add_cell(ArrayList cells, Cell cell)
     }
     else if (!cell_rescue(cells,cell_prev,cell,cell_prev2,prev2))
     {
+        if (check_ladder) // Add ladder attachment points
+        {
+            int ladder = ladder_from_to(cell_prev.navArea,cell.navArea);
+            if (ladder>0 && !twopos_traversable(cell_prev.center,cell.center))
+            {
+                static float pos1[3],pos2[3];
+                GetEntPropVector(ladder, Prop_Send, "m_vecMaxs", pos1);
+                GetEntPropVector(ladder, Prop_Send, "m_vecMins", pos2);
+                SortTwoVectorsClosest(cell_prev.center,pos1,pos2);
+                if (!navmesh_xy_too_far(cell_prev.navArea,pos1) && !navmesh_xy_too_far(cell.navArea,pos2))
+                {
+                    pos1[2] = L4D_NavArea_GetZ(cell_prev.navArea,pos1); pos1[2] += 16.0;
+                    pos2[2] = L4D_NavArea_GetZ(cell.navArea,pos2); pos2[2] += 16.0;
+                    
+                    static Cell cell_ladder;
+                    
+                    cell_ladder = cell_prev;
+                    cell_ladder.center = pos1;
+                    // wiggle pos1 around so it has LOS with cell_prev
+                    //guide_add_cell(cells,cell_ladder,false);
+                    cells.PushArray(cell_ladder);
+                    
+                    cell_ladder = cell;
+                    cell_ladder.center = pos2;
+                    // wiggle pos2 around so it has LOS with cell
+                    //guide_add_cell(cells,cell_ladder,false);
+                    cells.PushArray(cell_ladder);
+                }
+            }
+        }
         cells.PushArray(cell);
     }
 }
@@ -1998,6 +2021,20 @@ bool cell_rescue(ArrayList cells, Cell cell_old, Cell cell_new, Cell cell_prev2,
 
     if (elevator_available)
     {
+        
+        if (cell_new.navArea!=Address_Null) // clip cell_old.center to cell_new.navArea
+        {
+            pos_candidate = cell_old.center;
+            navmesh_clip(cell_new.navArea,pos_candidate);
+            pos_candidate[2] += 16.0; pos_candidates.PushArray(pos_candidate);
+        }
+        if (cell_old.navArea!=Address_Null) // clip cell_new.center to cell_old.navArea
+        {
+            pos_candidate = cell_new.center;
+            navmesh_clip(cell_old.navArea,pos_candidate);
+            pos_candidate[2] += 16.0; pos_candidates.PushArray(pos_candidate);
+        }
+        
         for (int dir = 0; dir < 4; dir++) // Add all 4 corners of navmesh. These are usually in very good positions for LOS.
         {
             L4D_NavArea_GetCorner(cell_new.navArea,view_as<NavCornerType>(dir),pos_candidate); pos_candidate[2] += 16.0; pos_candidates.PushArray(pos_candidate);
@@ -2068,15 +2105,15 @@ bool cell_rescue(ArrayList cells, Cell cell_old, Cell cell_new, Cell cell_prev2,
     while (!success)
     {
         int length = (priority) ? pos_candidates.Length : pos_candidates2.Length;
-        bool projected = false;
         for (int i = 0; i<length; i++) 
         {
+            bool projected = false;
             if (priority) pos_candidates.GetArray(i,pos_candidate,sizeof(pos_candidate));
             else pos_candidates2.GetArray(i,pos_candidate,sizeof(pos_candidate));
+            pos_template = pos_candidate;
             if (elevator_available && priority) // try to project xy onto navmesh z
             {
                 // Get appropriate z value for given xy position. Useful for slopes, stairs etc.
-                pos_template = pos_candidate;
                 projected = project_navmesh_xy(cell_new.navArea,pos_candidate);
                 if (!projected) projected = project_navmesh_xy(cell_old.navArea,pos_candidate);
                 if (projected)
@@ -2320,6 +2357,7 @@ bool TraceFilterStatic(int entity, int contentsMask)
         case 'f':
         {
             if (strncmp(class,"func_brush",10,false)==0) return true;
+            if (strncmp(class,"func_simpleladder",17,false)==0) return false;
             //g_bHitLadder = strncmp(class,"func_simpleladder",17,false)==0;
         }
     }

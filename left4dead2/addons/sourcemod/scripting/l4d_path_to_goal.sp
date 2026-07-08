@@ -17,7 +17,7 @@
 #include <dhooks>
 #include <l4d_path_to_goal>
 
-#define PLUGIN_VERSION 			"1.51 2026-07-02"
+#define PLUGIN_VERSION 			"1.52 2026-07-07"
 
 public Plugin myinfo =
 {
