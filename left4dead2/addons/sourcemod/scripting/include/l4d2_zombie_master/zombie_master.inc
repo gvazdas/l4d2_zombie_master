@@ -293,6 +293,7 @@ bool recordpos = true; // for ZM_ClientCleanup
 bool zm_just_joined = false; // for printing hints, playing intro sound
 int g_iLiveFallen;
 bool fallen_spawned;
+char zm_survivor_model[PLATFORM_MAX_PATH]; // keep zombie master survivor model in memory
 
 
 bool zm_draw_path;
@@ -2747,29 +2748,21 @@ void JoinZM(int client)
       		return;
   		}
     }
-    
-    if (GetClientTeam(client)==TEAM_SURVIVOR && IsPlayerAlive(client))
-    {
-        L4D_TakeOverBot(client);
-    }
-    
-    remove_all_ZM_glows();
-    // Hold player in spectator for a frame.
-    //ChangeClientTeam(client,TEAM_SPECTATOR);
+
+    if (GetClientTeam(client)==TEAM_SURVIVOR) GetClientModel(client,zm_survivor_model,sizeof(zm_survivor_model));
+    else zm_survivor_model = "";
     ChangeClientTeam(client,TEAM_ZM);
-    L4D_State_Transition(client, STATE_OBSERVER_MODE);
-    SetEntProp(client, Prop_Data, "m_iObserverMode", 6);
+    remove_all_ZM_glows();
     stop_sound(client,true);
     L4D_CleanupPlayerState(client);
-    if (GetClientTeam(client)==TEAM_ZM) RequestFrame(JoinZM_Post,client);
-    
+    RequestFrame(JoinZM_Post,client);
 }
 
 void JoinZM_Post(int client)
 {
     if (!g_bCvarAllow || zm_stage>=ZM_END || !IsValidClient(client) || IsFakeClient(client) || IsValidClientZM()) return;
     static char name[MAX_NAME_LENGTH]; 
-    if (GetClientTeam(client) != TEAM_ZM) ChangeClientTeam(client,TEAM_ZM);
+    if (GetClientTeam(client)!=TEAM_ZM) ChangeClientTeam(client,TEAM_ZM);
     L4D_State_Transition(client, STATE_OBSERVER_MODE);
     SetEntProp(client, Prop_Data, "m_iObserverMode", 6);
     zm_client = client;
@@ -2882,7 +2875,7 @@ void QuitZM_Force(int client)
     SetEntProp(client, Prop_Data, "m_iObserverMode", 6);
     L4D_CleanupPlayerState(client);
     QuitZM(client,false);
-    L4D_CleanupPlayerState(client);
+    //L4D_CleanupPlayerState(client);
 }
 
 void QuitZM(int client, bool print = true)
@@ -2890,6 +2883,8 @@ void QuitZM(int client, bool print = true)
 	if (DEBUG) LogMessage("[zm] QuitZM");
 	if (!g_bCvarAllow || client<=0 || !IsClientInGame(client) || IsFakeClient(client)) return;
 	
+    bool check_zm_model = false; // check zm_survivor_model
+
 	if (client==zm_client)
 	{
 	   if (IsValidClientZM())
@@ -2927,36 +2922,49 @@ void QuitZM(int client, bool print = true)
        zm_client_userid = -1;
        zm_menu_state = ZM_MENU_CLOSED;
        fair_queue_update(null);
+       check_zm_model = zm_survivor_model[0] != 0;
     }
     
     if (IsValidClient(client) && GetClientTeam(client)!=TEAM_SURVIVOR)
     {
-            // Find bot that can be taken over. Credit: l4dmultislots by HarryPotter
-            int bot = -1;
-            if (zm_stage<ZM_END)
+        L4D_CleanupPlayerState(client);
+        // Find bot that can be taken over. Credit: l4dmultislots by HarryPotter
+        // Goal here is to assign a bot, any bot, so extra survivors aren't created by accident.
+        int bot = -1;
+        static char model[PLATFORM_MAX_PATH];
+        for (int i = 1; i <= MaxClients; i++)
+        {
+            if (!IsClientInGame(i)) continue;
+            if (GetClientTeam(i)!=TEAM_SURVIVOR) continue;
+            if (!IsFakeClient(i)) continue;
+            int client_spec = L4D_GetIdlePlayerOfBot(i);
+            if (IsValidClient(client_spec) && !IsFakeClient(client_spec)) continue;
+            bool alive = IsPlayerAlive(i);
+            bool match = false; // found preferred survivor
+            if ( check_zm_model && (zm_stage>=ZM_END || alive) ) // check if this is the survivor ZM was before they became ZM.
             {
-                for (int i = 1; i <= MaxClients; i++)
-                {
-                    if (!IsClientInGame(i)) continue;
-                    if (GetClientTeam(i)!=TEAM_SURVIVOR) continue;
-                    if (!IsPlayerAlive(i)) continue;
-                    if (!IsFakeClient(i)) continue;
-                    if (HasEntProp(i,Prop_Send,"m_humanSpectatorUserID"))
-                    {
-                        if (GetEntProp(i, Prop_Send, "m_humanSpectatorUserID")>0) continue;
-                    }
-                    if (L4D_IsPlayerIncapacitated(i)) continue;
-                    bot = i;
-                    break;
-                }
+                GetClientModel(i,model,sizeof(model));
+                if (strcmp(model,zm_survivor_model,false)==0) match = true;
             }
+            if (bot>0 && !match) // Ignore worse candidates
+            {
+                if (!alive || L4D_IsPlayerIncapacitated(i)) continue;
+            }
+            bot = i;
+            if (match) break;
+        }
+        if(bot > 0)
+        {
+            //ChangeClientTeam(client,TEAM_SPECTATOR);
+            //ChangeClientTeam(bot,TEAM_SPECTATOR);
+            L4D_SetHumanSpec(bot,client);
+            L4D_TakeOverBot(client);
+        }
+        else
+        {
             ChangeClientTeam(client,TEAM_SURVIVOR);
-   			if(bot > 0)
-   			{
-   				L4D_SetHumanSpec(bot,client);
-   				L4D_TakeOverBot(client);
-   			}
-   			L4D_CleanupPlayerState(client);
+        }
+        //L4D_CleanupPlayerState(client);
     }
 
 }

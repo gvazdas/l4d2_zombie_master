@@ -12,7 +12,7 @@
 // Made for the Knockout.chat community
 // Plugin authors: gvazdas, zyiks, Skerion
 // HUGE THANKS TO TESTERS: Hatsune Miku Fan (God's Strongest Playtester), Skerion, Raykeno, IronBar, ngh, Lil Ole Fella, ShaunOfTheLive, zyiks
-// Chance, Lett1, AGGA Lambo, Robotnik, AriesToffle, Shadowcat, Wicket, GARFIELD'S SKELETON, Perchance, 
+// Chance, Lett1, AGGA Lambo, Robotnik, AriesToffle, Shadowcat, Wicket, GARFIELD'S SKELETON, Perchance, deathcycle,
 // Snake22, Mark9013100, Sarahtonin, Rex Bosworth, Sarah "NOTHING EVER HAPPENS" Tonin, g3intel, SomeENG, nativehenu, carex53, Captain Foxer, Sherly
 // HUGE THANKS for scripting help: HarryPotter, xerox8521, Forgetest, little_froy, Lux, Marttt, Bacardi, SilverShot, zyiks
 // HUGE THANKS TO Reagy and IronBar for hosting the Knockout Left 4 Dead 2 Server
@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.34d 2026-07-06"
+#define PLUGIN_VERSION 			"0.9.34e 2026-07-11"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -88,6 +88,8 @@ public Plugin myinfo =
 // 5. New cvar: zm_cost_angry 25
 // 6. Better Fallen Survivor logic.
 // 7. More robust refund logic for common infected and witches.
+// 8. Fixed extra survivor bot appearing after round end. Thanks to deathcycle for reporting.
+// 9. "Give Up" and round end will try to assign the ZM player back to their original survivor. Thanks to deathcycle for the idea.
 
 // TO DO LIST:
 // 15. Performance bottlenecks.
