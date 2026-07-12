@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.34e 2026-07-11"
+#define PLUGIN_VERSION 			"0.9.34f 2026-07-12"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -1997,15 +1997,10 @@ public void OnConfigsExecuted()
 
 void evtRoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
-	
 	if (DEBUG) LogMessage("[zm] evtRoundEnd");
-    
     invalidate_survivor_cache();
-    if (!g_bCvarAllow)
-    {
-        zm_stage = ZM_END;
-        return;
-    }
+    set_zm_stage(ZM_END,true);
+    if (!g_bCvarAllow) return;
     
 	bool ZM_won = true;
 	for( int i = 1; i <= MaxClients; i++ )
@@ -2022,8 +2017,8 @@ void evtRoundEnd(Event event, const char[] name, bool dontBroadcast)
 		{
     		ZM_won = false;
 		}
-		
 	}
+
 	if (IsValidClientZM())
 	{
     	if (ZM_won && !zm_win_announced)
@@ -2037,10 +2032,10 @@ void evtRoundEnd(Event event, const char[] name, bool dontBroadcast)
     	}
     	QuitZM_Force(zm_client); // InputKill prevention
 	}
+
 	g_iLockedDoor = INVALID_ENT_REFERENCE;
 	saferoom_locked = false;
 	Traps_TeardownAll();
-	set_zm_stage(ZM_END,true);
 	ResetTimer();
 	update_EMS_HUD();
 
@@ -2199,7 +2194,7 @@ public void OnPluginEnd()
 {
 	PvsForce_Cleanup();
     if (DEBUG) LogMessage("[zm] OnPluginEnd");
-    if (IsValidClientZM()) ChangeClientTeam(zm_client,TEAM_SURVIVOR);
+    if (IsValidClientZM()) QuitZM_Force(zm_client);
     Spawner_OnDisabled(zm_client);
     zm_client = -1;
     if (saferoom_locked) saferoom_lock(false);

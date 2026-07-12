@@ -2881,7 +2881,7 @@ void QuitZM_Force(int client)
 void QuitZM(int client, bool print = true)
 {
 	if (DEBUG) LogMessage("[zm] QuitZM");
-	if (!g_bCvarAllow || client<=0 || !IsClientInGame(client) || IsFakeClient(client)) return;
+	if (client<=0 || !IsClientInGame(client) || IsFakeClient(client)) return;
 	
     bool check_zm_model = false; // check zm_survivor_model
 
@@ -2964,9 +2964,7 @@ void QuitZM(int client, bool print = true)
         {
             ChangeClientTeam(client,TEAM_SURVIVOR);
         }
-        //L4D_CleanupPlayerState(client);
     }
-
 }
 
 Action QuitZM_Command(int client, int args)
