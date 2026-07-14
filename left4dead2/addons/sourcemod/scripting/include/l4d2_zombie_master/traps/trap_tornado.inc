@@ -104,6 +104,8 @@ stock void TrapTornado_ApplyForce(int slot, int entity, bool isPlayer)
     }
 }
 
+int tornado_roundcount;
+
 void TrapTornado_BeginArm()
 {
     if (!IsValidClientZM()) return;
@@ -119,6 +121,8 @@ void TrapTornado_BeginArm()
     TeleportEntity(anchor, pos, NULL_VECTOR, NULL_VECTOR);
     SetEntityMoveType(anchor, MOVETYPE_NONE);
 
+    int tornados_active = Trap_CountActive(ZM_TRAP_TYPE_TORNADO);
+
     int slot = Trap_Register(ZM_TRAP_TYPE_TORNADO, ZM_TRAP_FX_TORNADO, anchor);
     if (slot < 0) { RemoveEntity(anchor); update_hint("%T", "Trap max reached", zm_client); return; }
 
@@ -130,6 +134,15 @@ void TrapTornado_BeginArm()
         if (IsValidEntity(anchor)) RemoveEntity(anchor);
         update_hint("%T", "Trap invalid tornado", zm_client);
         return;
+    }
+    if (tornados_active<=0)
+    {
+        tornado_roundcount = roundcount;
+        for (int i = 1; i <= MaxClients; i++)
+        {
+            if (IsClientInGame(i)) SDKHook(i, SDKHook_OnTakeDamage, TrapTornado_OnTakeDamage);
+        }
+        RequestFrame(OnFrameTornado);
     }
     Trap_ConfirmArm();
     update_hint("%T", "Trap placed tornado", zm_client);
@@ -145,9 +158,17 @@ bool FX_Tornado_OnArm(int slot)
     return true;
 }
 
+void OnFrameTornado()
+{
+    if (Trap_CountActive(ZM_TRAP_TYPE_TORNADO)<=0 || tornado_roundcount!=roundcount || zm_stage>=ZM_END) return;
+    TrapTornado_Update();
+    RequestFrame(OnFrameTornado);
+}
+
 void TrapTornado_Update()
 {
     float now = GetGameTime();
+    //LogMessage("TrapTornado_Update %f", now);
     int expired[ZM_TRAP_MAX]; int nExpired = 0;
 
     for (int slot = 0; slot < ZM_TRAP_MAX; slot++)
@@ -190,8 +211,13 @@ void TrapTornado_RefreshImmunity(int client)
 // Probably needs optimization, SDKHook and Unhook on activate/deactivate
 public Action TrapTornado_OnTakeDamage(int victim, int& attacker, int& inflictor, float& damage, int& damagetype)
 {
+    //LogMessage("TrapTornado_OnTakeDamage %d", victim);
     if (victim < 1 || victim > MaxClients) return Plugin_Continue;
-    if (GetGameTime() >= g_fTornadoImmuneUntil[victim]) return Plugin_Continue;
+    if (!g_bCvarAllow || zm_stage>=ZM_END || tornado_roundcount!=roundcount || GetGameTime() >= g_fTornadoImmuneUntil[victim])
+    {
+        SDKUnhook(victim,SDKHook_OnTakeDamage,TrapTornado_OnTakeDamage);
+        return Plugin_Continue;
+    }
     if (damagetype & DMG_FALL) return Plugin_Handled;
     // block prop-impact damage while caught
     if (IsValidEntity(inflictor))

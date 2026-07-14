@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.34f 2026-07-12"
+#define PLUGIN_VERSION 			"0.9.34g 2026-07-13"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -90,6 +90,8 @@ public Plugin myinfo =
 // 7. More robust refund logic for common infected and witches.
 // 8. Fixed extra survivor bot appearing after round end. Thanks to deathcycle for reporting.
 // 9. "Give Up" and round end will try to assign the ZM player back to their original survivor. Thanks to deathcycle for the idea.
+// 10. zm_traps values: 0 1 2. 1 for finished traps, 2 for experimental traps
+// 11. Draw previews of units.
 
 // TO DO LIST:
 // 15. Performance bottlenecks.
@@ -423,9 +425,7 @@ public void OnPluginStart()
     TopMenu topmenu;
     if (LibraryExists("adminmenu") && ((topmenu = GetAdminTopMenu()) != null))
         OnAdminMenuReady(topmenu);
-
-    //for (int i = 1; i <= MaxClients; i++)
-    //    if (IsClientInGame(i)) SDKHook(i, SDKHook_OnTakeDamage, TrapTornado_OnTakeDamage);
+    
     PvsForce_Init();
 
     g_hMaxFallen = FindConVar("z_fallen_max_count"); // how many fallen are allowed
@@ -2194,6 +2194,7 @@ public void OnPluginEnd()
 {
 	PvsForce_Cleanup();
     if (DEBUG) LogMessage("[zm] OnPluginEnd");
+    zm_stage = ZM_END;
     if (IsValidClientZM()) QuitZM_Force(zm_client);
     Spawner_OnDisabled(zm_client);
     zm_client = -1;
@@ -2204,7 +2205,6 @@ public void OnPluginEnd()
     reset_time_of_day();
     unmute_zm();
     set_force_start(false);
-    zm_stage = ZM_END;
 }
 
 void Event_TriggeredCarAlarm(Event event, const char[] name, bool dontBroadcast)
@@ -2394,10 +2394,10 @@ void evt_ZM_start_imminent(Event event, const char[] name, bool dontBroadcast)
 
 public void OnClientPutInServer(int client)
 {
-    //SDKHook(client, SDKHook_OnTakeDamage, TrapTornado_OnTakeDamage);
 	if(!g_bCvarAllow) return;
 	if (!IsValidClient(client)) return;
 	if (DEBUG) LogMessage("[zm] OnClientPutInServer %d", client);
+    if (Trap_CountActive(ZM_TRAP_TYPE_TORNADO)>0) SDKHook(client, SDKHook_OnTakeDamage, TrapTornado_OnTakeDamage);
 	hp_timers[client] = null;
     //request_update_glow(client,true,0.0); // Force update glow to reduce glow glitches.
     if (IsPlayerAlive(client)) request_update_glow(client,true); 
@@ -2412,7 +2412,6 @@ public void OnClientPutInServer(int client)
        	CreateTimer(15.0,set_client_active,client,TIMER_FLAG_NO_MAPCHANGE);
        	if (fq_timer==INVALID_HANDLE) fq_timer = CreateTimer(2.0,fair_queue_update);
 	}
-	
 	if (clients_timer==INVALID_HANDLE) clients_timer = CreateTimer(0.1,CountClients);
 	if (zm_timer==INVALID_HANDLE) zm_update();
 }
@@ -2454,12 +2453,6 @@ public void OnClientDisconnect(int client)
    	      if (zm_stage<ZM_STARTED) can_zm_start();
    	   } 
     
-}
-
-public void OnGameFrame()
-{
-    if (Trap_CountActive(ZM_TRAP_TYPE_TORNADO) == 0) return; // self-gate: no work unless a tornado is active
-    TrapTornado_Update();
 }
 
 public void OnEntityDestroyed(int entity)

@@ -2868,9 +2868,10 @@ Action SoundHook_MuteZM(int clients[MAXPLAYERS], int &numClients, char sample[PL
     return Plugin_Continue;
 }
 
+// Send infected player into observer mode first so they are replaced by a bot.
 void QuitZM_Force(int client)
 {
-    if (!IsValidClient(client)) return;
+    if (!IsValidClient(client) || IsFakeClient(client)) return;
     L4D_State_Transition(client, STATE_OBSERVER_MODE);
     SetEntProp(client, Prop_Data, "m_iObserverMode", 6);
     L4D_CleanupPlayerState(client);
@@ -2881,7 +2882,7 @@ void QuitZM_Force(int client)
 void QuitZM(int client, bool print = true)
 {
 	if (DEBUG) LogMessage("[zm] QuitZM");
-	if (client<=0 || !IsClientInGame(client) || IsFakeClient(client)) return;
+	if (!IsValidClient(client) || IsFakeClient(client)) return;
 	
     bool check_zm_model = false; // check zm_survivor_model
 
