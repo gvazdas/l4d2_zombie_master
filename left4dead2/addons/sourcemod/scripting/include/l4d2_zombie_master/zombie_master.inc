@@ -139,6 +139,8 @@ static float HULL_MAXS_LOOK[3] = {HULL_DX,HULL_DX,HULL_DZ};
 
 #define SOUND_TORNADO_ALARM "ambient/alarms/perimeter_alarm.wav"
 
+#define SOUND_DENY "player/suit_denydevice.wav"
+#define SOUND_DRONE "music/terror/walkingdead.wav"
 #define SOUND_READY "ui/critical_event_1.wav"
 #define SOUND_OFFER "ui/pickup_misc42.wav"
 #define SOUND_REWARD "ui/beep_synthtone01.wav"
@@ -189,8 +191,8 @@ static float HULL_MAXS_LOOK[3] = {HULL_DX,HULL_DX,HULL_DZ};
 #define VMT_LASERBEAM "sprites/laserbeam.vmt"
 #define VMT_HALO "sprites/halo.vmt"
 
-#define MAXENTITIES                   2048
-#define ENTITY_SAFE_LIMIT 2000 //don't spawn boxes when it's index is above this
+#define MAXENTITIES        2048
+#define ENTITY_SAFE_LIMIT  2000
 #define ENTITY_SAFER_LIMIT 1900
 
 #define TEAM_SPECTATOR		1
@@ -198,15 +200,15 @@ static float HULL_MAXS_LOOK[3] = {HULL_DX,HULL_DX,HULL_DZ};
 #define TEAM_INFECTED		3
 #define TEAM_ZM 3
 
-#define ZOMBIECLASS_COMMON 	0
-#define ZOMBIECLASS_SMOKER 	1
+#define ZOMBIECLASS_COMMON 	 0
+#define ZOMBIECLASS_SMOKER 	 1
 #define ZOMBIECLASS_BOOMER	 2
 #define ZOMBIECLASS_HUNTER	 3
-#define ZOMBIECLASS_SPITTER	4
+#define ZOMBIECLASS_SPITTER	 4
 #define ZOMBIECLASS_JOCKEY	 5
-#define ZOMBIECLASS_CHARGER	6
-#define ZOMBIECLASS_WITCH	7
-#define ZOMBIECLASS_TANK	8
+#define ZOMBIECLASS_CHARGER	 6
+#define ZOMBIECLASS_WITCH	 7
+#define ZOMBIECLASS_TANK	 8
 
 // ZM stages
 #define ZM_NEWROUND 0 // Survivors in start area, no ZM picked.
@@ -294,8 +296,6 @@ bool zm_just_joined = false; // for printing hints, playing intro sound
 int g_iLiveFallen;
 bool fallen_spawned;
 char zm_survivor_model[PLATFORM_MAX_PATH]; // keep zombie master survivor model in memory
-
-
 bool zm_draw_path;
 
 // Spawner_CacheSurvivorData: PVS (Potentially Visible Set) engine calls + survivor position an
@@ -560,6 +560,35 @@ TopMenuObject obj_zmcommands, zm_enable, zm_gamemode_menu, zm_kick_topmenu, zm_r
 
 int zm_menu_state = ZM_MENU_CLOSED;
 Menu menu_main,menu_common,menu_uncommon,menu_special,menu_boss,menu_cleanup,menu_other,menu_quit,menu_items,menu_weapons,menu_traps;
+
+// Survivor Died
+#define SOUND_SURVIVOR_DIED "music/terror/theend.wav"
+
+// Freeze/Unfreeze audio cues
+
+// Special Spawn Sounds
+char sounds_SI[ZOMBIECLASS_TANK+1][2][PLATFORM_MAX_PATH];
+void PlaySoundSI(int ZOMBIECLASS, int bot)
+{
+	if (!IsValidClientZM() || !IsValidEntity(bot)) return;
+	static char sound[PLATFORM_MAX_PATH];
+	sound = sounds_SI[ZOMBIECLASS][GetRandomInt(0,1)];
+	if (sound[0]==0) return;
+	EmitSoundToClient(zm_client,sound,bot,_,SNDLEVEL_GUNFIRE,_,SNDVOL_NORMAL,GetRandomInt(95,105));
+}
+
+// Common Spawn Sounds
+#define CHOIR_COOLDOWN 10.0
+float t_choir;
+ArrayList sounds_choir;
+
+// PANIC + >20 alive commons
+#define GERM_COOLDOWN 30.0
+float t_germ;
+ArrayList sounds_germ;
+
+// Witch spawn sounds
+ArrayList sounds_witch;
 
 // Define groups with different spawn rules.
 // Commons cannot spawn in areas marked by IsBlocked
@@ -1370,6 +1399,11 @@ void toggle_ZM_vision(int client)
 	}
 	
     EmitSoundToClient(client,SOUND_VISION);
+}
+
+stock void ZM_Sound_Deny()
+{
+    EmitSoundToClient(zm_client,SOUND_DENY);
 }
 
 stock void process_horde_arg(int &count, char type[16], bool &angry, bool &flow, char arg[16])
@@ -2430,7 +2464,11 @@ void start_zm_round(bool play_sound = true)
  if (zm_stage<ZM_STARTED)
  {
      PrintToChatAll("[zm] %t", "Round started");
-     if (IsValidClientZM()) PrintHintText(zm_client, "%t", "Round started");
+     if (IsValidClientZM())
+     {
+        PrintHintText(zm_client, "%t", "Round started");
+        stop_sound(zm_client);
+     }
      update_hint("%T", "Round started", zm_client);
      if (play_sound) EmitSoundToAll(SOUND_START);
      t_round_start = GetGameTime();
@@ -2586,7 +2624,7 @@ void update_ZM_looktarget(bool draw = true)
       	 {
       	    float vOrigin[3];
       	    L4D_GetEntityWorldSpaceCenter(target,vOrigin);
-          	TE_SetupBeamRingPoint(vOrigin,50.0,0.0,g_iLaser,g_iHalo,0,0,1.0,1.5,0.0,color_unit_select,0,0);
+          	TE_SetupBeamRingPoint(vOrigin,50.0,0.0,g_iLaser,0,0,0,1.0,1.5,0.0,color_unit_select,0,0);
             TE_SendToClient(zm_client);
       	 }
       	 entref_delete = entref_temp;
@@ -2854,7 +2892,7 @@ void unmute_zm()
     if (zm_just_joined && IsValidClientZM())
     {
         PrintHintText(zm_client, "%t", "ZM join hint");
-        EmitSoundToClient(zm_client,SOUND_VISION);
+        EmitSoundToClient(zm_client,SOUND_DRONE);
         zm_just_joined = false;
     }
 }

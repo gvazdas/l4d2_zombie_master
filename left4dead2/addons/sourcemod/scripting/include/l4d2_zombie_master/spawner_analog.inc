@@ -27,7 +27,7 @@ bool g_bSpawnerFilterZM = false; // mark cells invisible to ZM as invalid?
  */
 void update_ZM_spawner(const float target_pos[3], const float spawner_pos[3], const int state, bool draw=true)
 {
-    if (draw && IsValidClientZM() && g_iLaser>0 && g_iHalo>0)
+    if (draw && IsValidClientZM() && g_iLaser>0)
     {
         static int color[4];
         if (state==SPAWNER_OK) color = color_allowed;
@@ -682,7 +682,7 @@ void mark_flow_survivor_and_zombie(int survivor=-1, int zombie=-1)
     if (!IsValidClientZM()) return;
     zm_flow_notify = true;
      
-    float vOrigin[3], draw_start[3], draw_end[3];
+    static float vOrigin[3], draw_start[3], draw_end[3];
     
     if (zombie>0 && IsValidEntity(zombie))
     {

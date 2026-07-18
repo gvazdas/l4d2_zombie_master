@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.34g 2026-07-13"
+#define PLUGIN_VERSION 			"0.9.34h 2026-07-18"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -92,6 +92,7 @@ public Plugin myinfo =
 // 9. "Give Up" and round end will try to assign the ZM player back to their original survivor. Thanks to deathcycle for the idea.
 // 10. zm_traps values: 0 1 2. 1 for finished traps, 2 for experimental traps
 // 11. Draw previews of units.
+// 12. Sound feedback for ZM.
 
 // TO DO LIST:
 // 15. Performance bottlenecks.
@@ -430,6 +431,84 @@ public void OnPluginStart()
 
     g_hMaxFallen = FindConVar("z_fallen_max_count"); // how many fallen are allowed
     g_hMaxFallen.AddChangeHook(ConVarChanged_Cvars_ZMenu);
+
+    // SI spawn sounds
+    sounds_SI[ZOMBIECLASS_BOOMER][0] =  "music/bacteria/boomerbacteria.wav";
+    sounds_SI[ZOMBIECLASS_BOOMER][1] =  "music/bacteria/boomerbacterias.wav";
+    sounds_SI[ZOMBIECLASS_CHARGER][0] = "music/bacteria/chargerbacteria.wav";
+    sounds_SI[ZOMBIECLASS_CHARGER][1] = "music/bacteria/chargerbacterias.wav";
+    sounds_SI[ZOMBIECLASS_HUNTER][0] =  "music/bacteria/hunterbacteria.wav";
+    sounds_SI[ZOMBIECLASS_HUNTER][1] =  "music/bacteria/hunterbacterias.wav";
+    sounds_SI[ZOMBIECLASS_JOCKEY][0] =  "music/bacteria/jockeybacteria.wav";
+    sounds_SI[ZOMBIECLASS_JOCKEY][1] =  "music/bacteria/jockeybacterias.wav";
+    sounds_SI[ZOMBIECLASS_SMOKER][0] =  "music/bacteria/smokerbacteria.wav";
+    sounds_SI[ZOMBIECLASS_SMOKER][1] =  "music/bacteria/smokerbacterias.wav";
+    sounds_SI[ZOMBIECLASS_SPITTER][0] = "music/bacteria/spitterbacteria.wav";
+    sounds_SI[ZOMBIECLASS_SPITTER][1] = "music/bacteria/spitterbacterias.wav";
+
+    if (sounds_choir==null) sounds_choir = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
+    sounds_choir.Clear();
+    sounds_choir.PushString("music/zombiechoir/zombiechoir_01.wav");
+    sounds_choir.PushString("music/zombiechoir/zombiechoir_02.wav");
+    sounds_choir.PushString("music/zombiechoir/zombiechoir_03.wav");
+    sounds_choir.PushString("music/zombiechoir/zombiechoir_04.wav");
+    sounds_choir.PushString("music/zombiechoir/zombiechoir_05.wav");
+    sounds_choir.PushString("music/zombiechoir/zombiechoir_06.wav");
+    sounds_choir.PushString("music/zombiechoir/zombiechoir_07.wav");
+    sounds_choir.PushString("music/zombiechoir/zombiechoir_01_l4d1.wav");
+    sounds_choir.PushString("music/zombiechoir/zombiechoir_02_l4d1.wav");
+    sounds_choir.PushString("music/zombiechoir/zombiechoir_03_l4d1.wav");
+    sounds_choir.PushString("music/zombiechoir/zombiechoir_04_l4d1.wav");
+    sounds_choir.PushString("music/zombiechoir/zombiechoir_05_l4d1.wav");
+    sounds_choir.PushString("music/zombiechoir/zombiechoir_06_l4d1.wav");
+    sounds_choir.PushString("music/zombiechoir/zombiechoir_07_l4d1.wav");
+
+    if (sounds_germ==null) sounds_germ = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
+    sounds_germ.Clear();
+    sounds_germ.PushString("music/mob/germl1a.wav");
+    sounds_germ.PushString("music/mob/germl1b.wav");
+    sounds_germ.PushString("music/mob/germl2a.wav");
+    sounds_germ.PushString("music/mob/germl2b.wav");
+    sounds_germ.PushString("music/mob/germm1a.wav");
+    sounds_germ.PushString("music/mob/germm1b.wav"); 
+    sounds_germ.PushString("music/mob/germm2a.wav");
+    sounds_germ.PushString("music/mob/germm2b.wav");
+    sounds_germ.PushString("music/mob/germs1a.wav");
+    sounds_germ.PushString("music/mob/germs1b.wav");
+    sounds_germ.PushString("music/mob/germs2a.wav");
+    sounds_germ.PushString("music/mob/germs2b.wav"); 
+    sounds_germ.PushString("music/mob/germx1a.wav"); 
+    sounds_germ.PushString("music/mob/germx1b.wav");
+    sounds_germ.PushString("music/mob/germx2a.wav");
+    sounds_germ.PushString("music/mob/germx2b.wav");
+    sounds_germ.PushString("music/mob/easygerml1a.wav");
+    sounds_germ.PushString("music/mob/easygerml1b.wav");
+    sounds_germ.PushString("music/mob/easygerml2a.wav");
+    sounds_germ.PushString("music/mob/easygerml2b.wav");
+    sounds_germ.PushString("music/mob/easygermm1a.wav");
+    sounds_germ.PushString("music/mob/easygermm1b.wav");
+    sounds_germ.PushString("music/mob/easygermm1c.wav");
+    sounds_germ.PushString("music/mob/easygermm1d.wav");
+    sounds_germ.PushString("music/mob/easygermm2c.wav");
+    sounds_germ.PushString("music/mob/easygermm2d.wav");
+    sounds_germ.PushString("music/mob/easygerms1a.wav");
+    sounds_germ.PushString("music/mob/easygerms1b.wav");
+    sounds_germ.PushString("music/mob/easygermx1a.wav");
+    sounds_germ.PushString("music/mob/easygermx1b.wav"); 
+    sounds_germ.PushString("music/mob/easygermx2a.wav");
+    sounds_germ.PushString("music/mob/easygermx2b.wav");
+
+    if (sounds_witch==null) sounds_witch = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
+    sounds_witch.Clear();
+    sounds_witch.PushString("music/witch/lost_little_witch_01a.wav");
+    sounds_witch.PushString("music/witch/lost_little_witch_01b.wav");
+    sounds_witch.PushString("music/witch/lost_little_witch_02a.wav");
+    sounds_witch.PushString("music/witch/lost_little_witch_02b.wav");
+    sounds_witch.PushString("music/witch/lost_little_witch_03a.wav");
+    sounds_witch.PushString("music/witch/lost_little_witch_03b.wav");
+    sounds_witch.PushString("music/witch/lost_little_witch_04a.wav");
+    sounds_witch.PushString("music/witch/lost_little_witch_04b.wav");
+
 }
 
 public void OnAdminMenuReady(Handle aTopMenu)
@@ -806,6 +885,20 @@ Action zm_update(Handle timer = null)
             t_last_autocommon = t_now;
             
         }
+
+        if (panic && live_zombie_arr[ZOMBIECLASS_COMMON]>=10)
+        {
+            SetConVarInt(FindConVar("director_panic_forever"), 1);
+            if (IsValidClientZM() && FloatAbs(t_now-t_germ)>GERM_COOLDOWN && FloatAbs(t_now-t_last_panic)>1.0)
+			{
+				int i_random = GetRandomInt(0,sounds_germ.Length-1);
+				static char sound[PLATFORM_MAX_PATH];
+				sounds_germ.GetString(i_random,sound,PLATFORM_MAX_PATH);
+				EmitSoundToClient(zm_client,sound);
+				t_germ = t_now;
+			}
+        }
+        else SetConVarInt(FindConVar("director_panic_forever"), 0);
         
    }
    
@@ -884,6 +977,7 @@ Action zm_update(Handle timer = null)
                 {
                     PrintToChat(zm_client, "%t", "Survivors rescued");
                     update_hint("%T", "Survivors rescued short", zm_client);
+                    EmitSoundToClient(zm_client,SOUND_REWARD);
                 }
             }
             bank += d_bank;
@@ -1597,7 +1691,11 @@ public Action evtPlayerDeath(Event event, const char[] name, bool dontBroadcast)
     
     if(GetClientTeam(victim)!=TEAM_INFECTED)
     {
-        if (GetClientTeam(victim)==TEAM_SURVIVOR) invalidate_survivor_cache(true);
+        if (GetClientTeam(victim)==TEAM_SURVIVOR)
+        {
+            invalidate_survivor_cache(true);
+            if (IsValidClientZM()) EmitSoundToClient(zm_client,SOUND_SURVIVOR_DIED,victim,_,SNDLEVEL_GUNFIRE,_,SNDVOL_NORMAL,GetRandomInt(95,105));
+        }
         return Plugin_Continue;
     }
     
@@ -1716,7 +1814,10 @@ public void OnMapStart()
 	g_iLaser = PrecacheModel(VMT_LASERBEAM, true);
 	g_iHalo = PrecacheModel(VMT_HALO, true);
 	
+    PrecacheSound(SOUND_SURVIVOR_DIED);
 	PrecacheSound(SOUND_REWARD);
+    PrecacheSound(SOUND_DRONE);
+    PrecacheSound(SOUND_DENY);
 	PrecacheSound(SOUND_READY);
 	PrecacheSound(SOUND_OFFER);
 	PrecacheSound(SOUND_BUG);
@@ -1740,6 +1841,31 @@ public void OnMapStart()
     PrecacheSound(EXPLOSION1);
     PrecacheSound(EXPLOSION2);
     PrecacheSound(EXPLOSION3);
+
+    // Precache Special Infected bacterias
+    for(int i = 1; i <= ZOMBIECLASS_TANK; i++)
+    {
+        if (sounds_SI[i][0][0] != 0) PrecacheSound(sounds_SI[i][0]);
+        if (sounds_SI[i][1][0] != 0) PrecacheSound(sounds_SI[i][1]);
+    }
+
+    static char buffer[PLATFORM_MAX_PATH];
+
+    for(int i = 0; i < sounds_choir.Length; i++)
+    {
+        sounds_choir.GetString(i,buffer,PLATFORM_MAX_PATH);
+        PrecacheSound(buffer);
+    }
+    for(int i = 0; i < sounds_germ.Length; i++)
+    {
+        sounds_germ.GetString(i,buffer,PLATFORM_MAX_PATH);
+        PrecacheSound(buffer);
+    }
+    for(int i = 0; i < sounds_witch.Length; i++)
+    {
+        sounds_witch.GetString(i,buffer,PLATFORM_MAX_PATH);
+        PrecacheSound(buffer);
+    }
 
     PrecacheGeneric(VMT_GNOME, true);
     
@@ -1788,7 +1914,6 @@ public void OnMapStart()
                 if (currentUrl[0]=='\0') g_hDownloadUrl.SetString("https://gvazdas.github.io/l4d2_zombie_master/left4dead2", false, false);
             }
             
-            char buffer[128];
             //if (lipsync_available) Format(buffer, sizeof(buffer), "sound/%s", SOUND_ELLIS_ZM);
             Format(buffer, sizeof(buffer), "sound/%s", SOUND_ELLIS_ZM_MP3);
             AddFileToDownloadsTable(buffer);

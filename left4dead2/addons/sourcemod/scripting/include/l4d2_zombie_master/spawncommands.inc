@@ -127,19 +127,31 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 	if (client == zm_client) update_spawner_zombieclass(ZOMBIECLASS_COMMON);
 	float t_start = GetEngineTime(); // for profiling
 	
-	if (hint && is_zm_spamming()) return;
-	
+	if (hint && is_zm_spamming())
+	{
+		if (client==zm_client) ZM_Sound_Deny();
+		return;
+	}
+
 	CountCommons(null,false);
 	if (live_zombie_arr[ZOMBIECLASS_COMMON]>=max_zombie_arr[ZOMBIECLASS_COMMON])
 	{
-        if (hint) update_hint("%T", "Limit reached", zm_client);
-        return;
+        if (hint)
+		{
+			if (client==zm_client) ZM_Sound_Deny();
+			update_hint("%T", "Limit reached", zm_client);
+		}
+		return;
 	}
 	
 	if (!is_zombie_available_cooldown(ZOMBIECLASS_COMMON))
 	{
-        if (hint) update_hint("%T", "Cooldown active", zm_client);
-        return;
+        if (hint)
+		{
+			if (client==zm_client) ZM_Sound_Deny();
+			update_hint("%T", "Cooldown active", zm_client);
+		}
+		return;
 	}
 	
 	if ((live_zombie_arr[ZOMBIECLASS_COMMON]+count)>max_zombie_arr[ZOMBIECLASS_COMMON])
@@ -149,7 +161,11 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 	g_iEntities = GetEntityCountEx();
 	if(count<=0 || (g_iEntities+count)>=ENTITY_SAFER_LIMIT)
 	{
-	   if (hint) update_hint("%T", "Limit reached", zm_client);
+	   if (hint)
+	   {
+	   		if (client==zm_client) ZM_Sound_Deny();
+			update_hint("%T", "Limit reached", zm_client);
+	   }
 	   return;
     }
 
@@ -180,7 +196,11 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 	{
     	if (jimmy_spawned && !force_type)
 		{
-			if (hint) update_hint("%T", "Limit reached", zm_client);
+			if (hint)
+			{
+				if (client==zm_client) ZM_Sound_Deny();
+				update_hint("%T", "Limit reached", zm_client);
+			}
 			return;
 		}
 		if (!force_type) count = 1;
@@ -190,7 +210,11 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 		int max = g_hMaxFallen.IntValue - g_iLiveFallen;
 		if (max<=0 || fallen_spawned)
 		{
-			if (hint) update_hint("%T", "Limit reached", zm_client);
+			if (hint)
+			{
+				if (client==zm_client) ZM_Sound_Deny();
+				update_hint("%T", "Limit reached", zm_client);
+			}
 			return;
 		}
 		if (count>max) count = max;
@@ -202,8 +226,12 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 	int temp_cost = calculate_infected_cost(temp_gender,price_angry);
 	if (temp_cost<0)
 	{
-    	if (hint) update_hint("%T", "Limit reached", zm_client);
- 	    return;
+    	if (hint)
+		{
+			if (client==zm_client) ZM_Sound_Deny();
+			update_hint("%T", "Limit reached", zm_client);
+		}
+		return;
 	}
 	
 	int max_count = RoundToFloor(float(bank)/(temp_cost));
@@ -211,8 +239,12 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 	
 	if ( count<=0 || (bank-temp_cost*count)<0 )
 	{
-       	if (hint) update_hint("%T", "afford_common", zm_client);
-       	return;
+       	if (hint)
+		{
+			if (client==zm_client) ZM_Sound_Deny();
+			update_hint("%T", "afford_common", zm_client);
+		}
+		return;
 	}
 
 	// Resolve spawn positions via provider
@@ -233,6 +265,9 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
     int target_client = -1;
     if (angry && !flow && IsValidClientZM()) target_client = get_spawner_target_survivor(flow);
 
+	float t_game = GetGameTime();
+	bool can_choir = client==zm_client && sounds_choir.Length>0 && FloatAbs(t_game-t_choir)>CHOIR_COOLDOWN;
+
 	for( int i = 0; i < count; i++  )
 	{
 		int idx = (i % posCount) * 3;
@@ -244,12 +279,20 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 		temp_cost = calculate_infected_cost(temp_gender,price_angry);
 		if (temp_cost<0)
 		{
-			if (hint) update_hint("%T", "Limit reached", zm_client);
+			if (hint)
+			{
+				if (client==zm_client) ZM_Sound_Deny();
+				update_hint("%T", "Limit reached", zm_client);
+			}
 			return;
 		}
 		if (temp_cost>bank)
 		{
-			if (hint && spawned<=0) update_hint("%T", "afford_common", zm_client);
+			if (hint && spawned<=0)
+			{
+				if (client==zm_client) ZM_Sound_Deny();
+				update_hint("%T", "afford_common", zm_client);
+			}
 			return;
 		}
 
@@ -295,6 +338,15 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
            Spawner_NotifySpawned(zombie);
 		   SET_TRANSMIT_ALWAYS(zombie);
 		   g_iCostList[zombie] = temp_cost;
+		    if (can_choir)
+			{
+				int i_random = GetRandomInt(0,sounds_choir.Length-1);
+				static char sound[PLATFORM_MAX_PATH];
+				sounds_choir.GetString(i_random,sound,PLATFORM_MAX_PATH);
+				EmitSoundToClient(zm_client,sound,zombie,_,SNDLEVEL_GUNFIRE,_,SNDVOL_NORMAL,GetRandomInt(95,105));
+				t_choir = t_game;
+				can_choir = false;
+			}
         }
         if ((GetEngineTime()-t_start)*1000.0>t_budget_ms) break;
     }
@@ -302,8 +354,11 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 
 	if (spawned<=0)
 	{
-    	if (hint) update_hint("%T", "Spawn failed", zm_client);
-    	if (live_zombie_arr[ZOMBIECLASS_COMMON]<10) SetConVarInt(FindConVar("director_panic_forever"), 0);
+    	if (hint)
+		{
+			update_hint("%T", "Spawn failed", zm_client);
+		}
+		if (live_zombie_arr[ZOMBIECLASS_COMMON]<10) SetConVarInt(FindConVar("director_panic_forever"), 0);
 	}
 	else
 	{
@@ -357,7 +412,11 @@ void ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
 
 	if (DEBUG) LogMessage("[zm] ZM_Witch");
 
-	if (is_zm_spamming()) return;
+	if (is_zm_spamming())
+	{
+		if (client==zm_client) ZM_Sound_Deny();
+		return;
+	}
 
 	int temp_cost;
 	if (!free)
@@ -366,7 +425,8 @@ void ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
     	else temp_cost=g_iCostWitchMoving;
     	if ((bank-temp_cost)<0)
     	{
-        	update_hint("%T", "Cannot afford", zm_client);
+        	if (client==zm_client) ZM_Sound_Deny();
+			update_hint("%T", "Cannot afford", zm_client);
         	return;
     	}
 	}
@@ -374,13 +434,15 @@ void ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
 	CountWitches(false);
 	if (live_zombie_arr[ZOMBIECLASS_WITCH]>=max_zombie_arr[ZOMBIECLASS_WITCH] || temp_cost<0)
 	{
-    	update_hint("%T", "Limit reached", zm_client);
+    	if (client==zm_client) ZM_Sound_Deny();
+		update_hint("%T", "Limit reached", zm_client);
     	return;
 	}
 
 	if (!is_zombie_available_cooldown(ZOMBIECLASS_WITCH))
 	{
-    	update_hint("%T", "Cooldown active", zm_client);
+    	if (client==zm_client) ZM_Sound_Deny();
+		update_hint("%T", "Cooldown active", zm_client);
         return;
 	}
 
@@ -407,6 +469,13 @@ void ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
 	{
        	if (strcmp(g_sZMGamemode,"zm_jimmypocalypse",false)==0 && witch_type==WITCH_STATIC) SetEntityModel(witch,MODEL_JIMMY);
        	if (!free) bank -= temp_cost;
+		if (client==zm_client && live_zombie_arr[ZOMBIECLASS_WITCH]<=0 && sounds_witch.Length>0)
+		{
+			int i_random = GetRandomInt(0,sounds_witch.Length-1);
+			static char sound[PLATFORM_MAX_PATH];
+			sounds_witch.GetString(i_random,sound,PLATFORM_MAX_PATH);
+			EmitSoundToClient(zm_client,sound,witch,_,SNDLEVEL_GUNFIRE,_,SNDVOL_NORMAL,GetRandomInt(95,105));
+		}
        	live_zombie_arr[ZOMBIECLASS_WITCH] += 1;
        	if (DEBUG) LogMessage("[zm] Created witch %d", witch);
        	CreateTimer(g_fUpdateRate, CreateZMGlow_white, EntIndexToEntRef(witch), TIMER_FLAG_NO_MAPCHANGE);
@@ -803,27 +872,34 @@ void OnNextFrame_ZeroCooldown(int entity)
  */
 int ZM_Spawn_SI(int client, int ZOMBIECLASS, bool free = false, bool setpos=false, float pos[3] = {0.0,0.0,0.0}, bool glow = true, bool flow = false)
 {
-	if (!g_bCvarAllow || ZOMBIECLASS<=0) return -1;
+	if (!g_bCvarAllow || ZOMBIECLASS<=0 || ZOMBIECLASS>ZOMBIECLASS_TANK) return -1;
 	if (!(client==zm_client || client==0)) return -1;
 
 	if (!l4d2_specials)
     {
         if (ZOMBIECLASS==ZOMBIECLASS_SPITTER || ZOMBIECLASS==ZOMBIECLASS_JOCKEY || ZOMBIECLASS==ZOMBIECLASS_CHARGER)
-            return -1;
+		{
+            if (client==zm_client) ZM_Sound_Deny();
+			return -1;
+		}
     }
 
 	//LogMessage("[zm] ZM_Spawn_SI %d %d", ZOMBIECLASS, flow);
     if (client == zm_client) update_spawner_zombieclass(ZOMBIECLASS);
     
-	if (!setpos && is_zm_spamming()) return -1;
-
+	if (!setpos && is_zm_spamming())
+	{
+		if (client==zm_client) ZM_Sound_Deny();
+		return -1;
+	}
 	int cost_SI;
 	if (!free)
 	{
     	cost_SI = costs_SI[ZOMBIECLASS];
     	if ((bank-cost_SI)<0)
     	{
-        	update_hint("%T", "afford_special", zm_client);
+        	if (client==zm_client) ZM_Sound_Deny();
+			update_hint("%T", "afford_special", zm_client);
         	return -1;
     	}
 	}
@@ -834,13 +910,15 @@ int ZM_Spawn_SI(int client, int ZOMBIECLASS, bool free = false, bool setpos=fals
 	{
 	    if (live_SI>=max_SI || live_zombie_arr[ZOMBIECLASS]>=max_zombie_arr[ZOMBIECLASS] || cost_SI<0)
         {
-            update_hint("%T", "Limit reached", zm_client);
+            if (client==zm_client) ZM_Sound_Deny();
+			update_hint("%T", "Limit reached", zm_client);
             return -1;
         }
 
 	    if (!is_zombie_available_cooldown(ZOMBIECLASS))
         {
-           	update_hint("%T", "Cooldown active", zm_client);
+           	if (client==zm_client) ZM_Sound_Deny();
+			update_hint("%T", "Cooldown active", zm_client);
            	return -1;
         }
         
@@ -899,8 +977,8 @@ int ZM_Spawn_SI(int client, int ZOMBIECLASS, bool free = false, bool setpos=fals
 
         if (!setpos)
         {
-
-            active_looktarget = true;
+            if (client==zm_client && live_zombie_arr[ZOMBIECLASS]<=0 && ZOMBIECLASS!=ZOMBIECLASS_TANK) PlaySoundSI(ZOMBIECLASS,bot);
+			active_looktarget = true;
             add_available_zombie(ZOMBIECLASS,-1);
             L4D2_SetCustomAbilityCooldown(bot,1.0); // 1.0s cooldown to prevent abuse
             RequestFrame(OnNextFrame_ZeroCooldown,bot);
