@@ -1801,6 +1801,8 @@ stock bool explore_stitch(ArrayList cells, int &i_start, int max_steps = 50)
     if (ConAdj==null) ConAdj = new ArrayList(sizeof(NavConnection));
     if (AdjNN==null) AdjNN = new ArrayList(); // nearest neighbor explore for dips in flow when about to climb a ladder
     cells_explore.Clear();
+    if (explored==null) explored = new ArrayList();
+    explored.Clear();
 
     cells.GetArray(i_start-1,cell,sizeof(Cell));
     static float pos_curr[3], pos_temp[3], pos_best[3];
@@ -1826,6 +1828,8 @@ stock bool explore_stitch(ArrayList cells, int &i_start, int max_steps = 50)
             ConAdj.GetArray(i,nav_connection,sizeof(NavConnection));
             if (nav_connection.navArea == Address_Null || nav_connection.connectiontype <= CONNECTED_NOT) continue;
             if (nav_connection.navArea == navArea_curr) continue;
+            if (explored.FindValue(nav_connection.navArea)>=0) continue;
+            explored.Push(nav_connection.navArea);
             if (blocked_available && L4D_NavArea_IsBlocked(nav_connection.navArea,TEAM_SURVIVOR,true)) continue;
             flow_temp = L4D2Direct_GetTerrorNavAreaFlow(nav_connection.navArea);
             int count2 = navArea_ladder_navAreas(nav_connection.navArea,AdjNN,TEAM_SURVIVOR); // ladder intervention. flow dips when stepping onto ladder navmeshes...
