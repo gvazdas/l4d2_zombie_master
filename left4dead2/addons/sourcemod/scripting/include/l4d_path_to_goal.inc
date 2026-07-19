@@ -1017,6 +1017,8 @@ bool frame_budget_exceeded()
     return exceeded;
 }
 
+ArrayList explored_finale;
+
 void OnFramePrep(bool new_frame = true)
 {
     if (!enable || guide_ready || !gamemode_guidable || !map_started || !nav_started || g_iPrepStage<=STAGE_NONE || g_iPrepStage>=STAGE_END)
@@ -1269,7 +1271,7 @@ void OnFramePrep(bool new_frame = true)
                 guide_prep = false;
                 return;
             }
-            while (g_iLoop<all_cells.Length)
+            while (all_cells.Length>1 && g_iLoop<all_cells.Length)
             {
                 if (frame_budget_exceeded()) { budget_spent = true; break; }
                 all_cells.GetArray(g_iLoop,cell,sizeof(Cell));
@@ -1315,6 +1317,8 @@ void OnFramePrep(bool new_frame = true)
                     LogMessage("rescue vehicle flow %f max guide flow %f", g_fFlowRescueVehicle, max_guide_flow);
                     #endif
                     finale_backwards = g_fFlowRescueVehicle<max_guide_flow;
+                    if (explored_finale==null) explored_finale = new ArrayList();
+                    explored_finale.Clear();
                 }
                 g_iLoop = 1;
             }
@@ -1356,6 +1360,8 @@ void OnFramePrep(bool new_frame = true)
                         if (nav_connection.navArea == Address_Null || nav_connection.connectiontype <= CONNECTED_NOT) continue;
                         if (nav_connection.navArea == navArea_curr) continue;
                         if (blocked_available && L4D_NavArea_IsBlocked(nav_connection.navArea,TEAM_SURVIVOR,true)) continue;
+                        if (explored_finale.FindValue(nav_connection.navArea)>=0) continue;
+                        explored_finale.Push(nav_connection.navArea);
                         flow_temp = L4D2Direct_GetTerrorNavAreaFlow(nav_connection.navArea);
                         #if DEBUG>1
                             LogMessage("STAGE_FINALE (%d %.1f) try %d %d %.1f", navArea_curr, flow_curr, nav_connection.connectiontype, nav_connection.navArea, flow_temp);
@@ -1394,7 +1400,6 @@ void OnFramePrep(bool new_frame = true)
                         }
                     }
                     
-
                     if (!found)
                     {
                         if (try_ladder(flow_curr,pos_curr,cell,finale_backwards))
@@ -1421,6 +1426,7 @@ void OnFramePrep(bool new_frame = true)
                 }
                 if (!budget_spent)
                 {
+                    explored_finale.Clear();
                     #if DEBUG
                     LogMessage("Rescue vehicle cells %d", RescueVehicleCells.Length);
                     #endif
@@ -1733,6 +1739,7 @@ ArrayList cells_explore;
 #define STITCH_GAP_OK 2 // how many cells ahead to check for further disjointed navAreas
 stock bool explore_stitch(ArrayList cells, int &i_start, int max_steps = 50)
 {
+    if (i_start<=1 || i_start>=cells.Length) return false;
     static Cell cell, cell2;
 
     int stitch_gap = STITCH_GAP_OK;
@@ -1774,7 +1781,7 @@ stock bool explore_stitch(ArrayList cells, int &i_start, int max_steps = 50)
             num_delete -= 1;
         }
     }
-    else if (i_start<(cells.Length-1)) // is i_start+1 connected to i_start-1?
+    else if (i_start>0 && i_start<(cells.Length-1)) // is i_start+1 connected to i_start-1?
     {
         cells.GetArray(i_start-1,cell,sizeof(Cell));
         cells.GetArray(i_start+1,cell2,sizeof(Cell));
@@ -1787,6 +1794,8 @@ stock bool explore_stitch(ArrayList cells, int &i_start, int max_steps = 50)
             return true;
         }
     }
+
+    if (cells.Length<=1) return false;
 
     if (cells_explore==null) cells_explore = new ArrayList(sizeof(Cell));
     if (ConAdj==null) ConAdj = new ArrayList(sizeof(NavConnection));
@@ -1862,7 +1871,6 @@ stock bool explore_stitch(ArrayList cells, int &i_start, int max_steps = 50)
                 if (success) break;
             }
         }
-        if (success) break;
         
         if (found)
         {
@@ -2111,7 +2119,7 @@ bool cell_rescue(ArrayList cells, Cell cell_old, Cell cell_new, Cell cell_prev2,
             if (priority) pos_candidates.GetArray(i,pos_candidate,sizeof(pos_candidate));
             else pos_candidates2.GetArray(i,pos_candidate,sizeof(pos_candidate));
             pos_template = pos_candidate;
-            if (elevator_available && priority) // try to project xy onto navmesh z
+            if (priority && elevator_available) // try to project xy onto navmesh z
             {
                 // Get appropriate z value for given xy position. Useful for slopes, stairs etc.
                 projected = project_navmesh_xy(cell_new.navArea,pos_candidate);

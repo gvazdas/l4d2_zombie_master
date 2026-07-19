@@ -79,7 +79,7 @@ Action Open_Saferoom(Handle timer, bool scary = false)
 			CreateShake(50.0,5000.0,vPos);
 			CreateShake(50.0,5000.0,vPos);
 			
-			char sound_explosion[64];
+			static char sound_explosion[PLATFORM_MAX_PATH];
 			switch (GetRandomInt(1,3))
 			{
     			case 1: sound_explosion = EXPLOSION1;

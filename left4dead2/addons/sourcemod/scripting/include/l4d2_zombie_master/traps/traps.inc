@@ -63,9 +63,10 @@ stock int Trap_TypeCost(int type)
 {
     switch (type)
     {
-        case ZM_TRAP_TYPE_DOOR:    return g_iCostTrapDoor;
-        case ZM_TRAP_TYPE_CAR:     return g_iCostTrapCar;
-        case ZM_TRAP_TYPE_TORNADO: return g_iCostTrapTornado;
+        case ZM_TRAP_TYPE_EXPLOSION:    return g_hCostExplosion.IntValue;
+        case ZM_TRAP_TYPE_DOOR:         return g_iCostTrapDoor;
+        case ZM_TRAP_TYPE_CAR:          return g_iCostTrapCar;
+        case ZM_TRAP_TYPE_TORNADO:      return g_iCostTrapTornado;
     }
     return -1;
 }
@@ -75,9 +76,10 @@ stock int Trap_TypeMax(int type)
 {
     switch (type)
     {
-        case ZM_TRAP_TYPE_DOOR:    return g_iMaxTrapDoor;
-        case ZM_TRAP_TYPE_CAR:     return g_iMaxTrapCar;
-        case ZM_TRAP_TYPE_TORNADO: return g_iMaxTrapTornado;
+        case ZM_TRAP_TYPE_EXPLOSION: return 1;
+        case ZM_TRAP_TYPE_DOOR:      return g_iMaxTrapDoor;
+        case ZM_TRAP_TYPE_CAR:       return g_iMaxTrapCar;
+        case ZM_TRAP_TYPE_TORNADO:   return g_iMaxTrapTornado;
     }
     return 0;
 }
@@ -122,7 +124,7 @@ public bool FilterTrapAim(int entity, int mask, int self)
 stock int Trap_GetAimedEntity(float hitPos[3])
 {
     if (!IsValidClientZM()) return -1;
-    float vOrigin[3], vAngles[3];
+    static float vOrigin[3], vAngles[3];
     GetClientEyePosition(zm_client, vOrigin);
     GetClientEyeAngles(zm_client, vAngles);
     Handle trace = TR_TraceRayFilterEx(vOrigin, vAngles, MASK_SOLID, RayType_Infinite, FilterTrapAim, zm_client);
@@ -147,7 +149,8 @@ stock int Trap_Register(int type, int effect, int entity)
     g_Traps[slot].Clear();
     g_Traps[slot].type = type;
     g_Traps[slot].effect = effect;
-    g_Traps[slot].entRef = EntIndexToEntRef(entity);
+    if (IsValidEntity(entity)) g_Traps[slot].entRef = EntIndexToEntRef(entity);
+    else g_Traps[slot].entRef = INVALID_ENT_REFERENCE;
     g_Traps[slot].ownerUserId = (IsValidClientZM() ? GetClientUserId(zm_client) : -1);
     g_Traps[slot].state = ZM_TRAP_STATE_ARMED;
     g_Traps[slot].costPaid = cost;

@@ -17,13 +17,13 @@
 #include <dhooks>
 #include <l4d_path_to_goal>
 
-#define PLUGIN_VERSION 			"1.52 2026-07-07"
+#define PLUGIN_VERSION 			"1.53 2026-07-19"
 
 public Plugin myinfo =
 {
 	name = "[L4D1/L4D2] Path To Goal",
 	author = "gvazdas, zyiks",
-	description = "Automatic path to goal indicator.",
+	description = "Automatic path to goal indicator for Survivor team.",
 	version = PLUGIN_VERSION,
 	url = "https://forums.alliedmods.net/showthread.php?t=352685, https://github.com/gvazdas/l4d2_zombie_master"
 }

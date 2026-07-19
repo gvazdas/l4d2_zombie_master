@@ -37,9 +37,10 @@
 // --- Trap system ---
 #define ZM_TRAP_MAX 16
 
-#define ZM_TRAP_TYPE_DOOR    0
-#define ZM_TRAP_TYPE_CAR     1
-#define ZM_TRAP_TYPE_TORNADO 2
+#define ZM_TRAP_TYPE_DOOR      0
+#define ZM_TRAP_TYPE_CAR       1
+#define ZM_TRAP_TYPE_TORNADO   2
+#define ZM_TRAP_TYPE_EXPLOSION 3
 
 #define ZM_TRAP_FX_PANIC   0
 #define ZM_TRAP_FX_ALARM   1
@@ -438,7 +439,7 @@ ConVar g_hBankRateBase, g_hBankRatePlayer, g_hBankInitial, g_hBankInitialPlayer,
        g_hMenuTimeout, g_hDiscountTank, g_hMemes, g_hClownGlow, g_hForceCommon, g_hHoldFinale, g_hZMGamemode, g_hVomitCommons, g_hAllowFreeze,
        //g_hGridSearchRadius,
        g_hGrid, g_hSpawnerMode, g_hPanicRefill, g_hCursed, g_hGridCooldown, g_hTraps, g_hJumpscare, g_hGnome;
-ConVar g_hCostTrapDoor, g_hCostTrapCar, g_hMaxTrapDoor, g_hMaxTrapCar, g_hTrapCooldown, g_hTrapDoorBurst;
+ConVar g_hCostTrapDoor, g_hCostTrapCar, g_hMaxTrapDoor, g_hMaxTrapCar, g_hTrapCooldown, g_hTrapDoorBurst, g_hCostExplosion;
 ConVar g_hCostTrapTornado, g_hMaxTrapTornado, g_hTornadoDuration, g_hTornadoRadius, g_hTornadoHeight, g_hTornadoGrace;
 
 float g_fBankRateBase,g_fBankRatePlayer,g_fUpdateRate,g_fSpawnMinDistance,g_fStopInactivity,g_fSpecialCooldown, g_fPanicRateMultiplier,
@@ -1403,7 +1404,7 @@ void toggle_ZM_vision(int client)
 
 stock void ZM_Sound_Deny()
 {
-    EmitSoundToClient(zm_client,SOUND_DENY);
+    EmitSoundToClient(zm_client,SOUND_DENY,_,_,_,_,0.5);
 }
 
 stock void process_horde_arg(int &count, char type[16], bool &angry, bool &flow, char arg[16])

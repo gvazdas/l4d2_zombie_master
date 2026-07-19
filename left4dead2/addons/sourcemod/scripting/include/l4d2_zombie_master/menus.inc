@@ -636,23 +636,32 @@ void create_traps_menu()
 	Format(buffer, sizeof(buffer), "%T", "Traps", zm_language);
 	menu_traps.SetTitle(buffer);
 
-	// Row 0: Panic door
-	if (g_iCostTrapDoor>=0 && g_iMaxTrapDoor>0)
-		Format(buffer, sizeof(buffer), "%T %d %d/%d", "Trap Panic Door", zm_language, g_iCostTrapDoor, Trap_CountActive(ZM_TRAP_TYPE_DOOR), g_iMaxTrapDoor);
-	else buffer = "-";
-	AddMenuItem(menu_traps, "item_1", buffer);
+    // Row 0: Explosion
+    Format(buffer, sizeof(buffer), "%s %d", "Explosion", g_hCostExplosion.IntValue);
+    if (g_hTraps.IntValue<=1) buffer_add_rawline(buffer);
+    AddMenuItem(menu_traps, "item_0", buffer);
 
-	// Row 1: Alarm car
-	if (g_iCostTrapCar>=0 && g_iMaxTrapCar>0)
-		Format(buffer, sizeof(buffer), "%T %d %d/%d", "Trap Alarm Car", zm_language, g_iCostTrapCar, Trap_CountActive(ZM_TRAP_TYPE_CAR), g_iMaxTrapCar);
-	else buffer = "-";
-	AddMenuItem(menu_traps, "item_2", buffer);
+    if (g_hTraps.IntValue>1)
+    {
+        // Row 1: Panic door
+        if (g_iCostTrapDoor>=0 && g_iMaxTrapDoor>0)
+            Format(buffer, sizeof(buffer), "%T %d %d/%d", "Trap Panic Door", zm_language, g_iCostTrapDoor, Trap_CountActive(ZM_TRAP_TYPE_DOOR), g_iMaxTrapDoor);
+        else buffer = "-";
+        AddMenuItem(menu_traps, "item_1", buffer);
 
-	if (g_iCostTrapTornado>=0 && g_iMaxTrapTornado>0)
-		Format(buffer, sizeof(buffer), "%T %d %d/%d", "Trap Tornado", zm_language, g_iCostTrapTornado, Trap_CountActive(ZM_TRAP_TYPE_TORNADO), g_iMaxTrapTornado);
-	else buffer = "-";
-    buffer_add_rawline(buffer);
-	AddMenuItem(menu_traps, "item_3", buffer);
+        // Row 2: Alarm car
+        if (g_iCostTrapCar>=0 && g_iMaxTrapCar>0)
+            Format(buffer, sizeof(buffer), "%T %d %d/%d", "Trap Alarm Car", zm_language, g_iCostTrapCar, Trap_CountActive(ZM_TRAP_TYPE_CAR), g_iMaxTrapCar);
+        else buffer = "-";
+        AddMenuItem(menu_traps, "item_2", buffer);
+
+        // Row 3: Trap Tornado
+        if (g_iCostTrapTornado>=0 && g_iMaxTrapTornado>0)
+            Format(buffer, sizeof(buffer), "%T %d %d/%d", "Trap Tornado", zm_language, g_iCostTrapTornado, Trap_CountActive(ZM_TRAP_TYPE_TORNADO), g_iMaxTrapTornado);
+        else buffer = "-";
+        buffer_add_rawline(buffer);
+        AddMenuItem(menu_traps, "item_3", buffer);
+    }
 
 	if (zm_menu_state == ZM_MENU_TRAPS && IsValidClientZM()) open_menu(zm_client,ZM_MENU_TRAPS);
 }
@@ -665,9 +674,10 @@ int traps_menu_Handler(Menu menu, MenuAction action, int param1, int param2)
         	if (param1!=zm_client || zm_stage>=ZM_END) return 0;
         	switch(param2)
         	{
-            	case 0: TrapDoor_BeginArm();
-            	case 1: TrapCar_BeginArm();
-            	case 2: TrapTornado_BeginArm();
+            	case 0: TrapExplosion_BeginArm();
+                case 1: TrapDoor_BeginArm();
+            	case 2: TrapCar_BeginArm();
+            	case 3: TrapTornado_BeginArm();
             	default: zm_menu_state=ZM_MENU_MAIN;
         	}
         	RequestFrame(reopen_zm_menu,true);

@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.34h 2026-07-18"
+#define PLUGIN_VERSION 			"0.9.34i 2026-07-18"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -61,6 +61,7 @@ bool DEBUG = false;
 #include <l4d2_zombie_master/traps/traps>
 #include <l4d2_zombie_master/traps/trap_door>
 #include <l4d2_zombie_master/traps/trap_car>
+#include <l4d2_zombie_master/traps/trap_explosion>
 #include <l4d2_zombie_master/traps/trap_tornado>
 #include <l4d2_zombie_master/survivor_inventory>
 
@@ -92,10 +93,9 @@ public Plugin myinfo =
 // 9. "Give Up" and round end will try to assign the ZM player back to their original survivor. Thanks to deathcycle for the idea.
 // 10. zm_traps values: 0 1 2. 1 for finished traps, 2 for experimental traps
 // 11. Draw previews of units.
-// 12. Sound feedback for ZM.
+// 12. More audio cues for ZM.
 
 // TO DO LIST:
-// 15. Performance bottlenecks.
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
 // 26. No fog for ZM
 // 30. Bring back inputkill prevention. Might not need it though.
@@ -160,7 +160,8 @@ public void OnPluginStart()
 	RegConsoleCmd("zm_autocommon_max", zm_autocommon_max, "n");
 	RegConsoleCmd("zm_freeze", zm_freeze, "Freeze/unfreeze all specials.");
 	RegConsoleCmd("zm_gamemode_menu", ZM_Gamemode_Command, "Admins: select gamemode. Clients: vote for gamemode.");
-    RegConsoleCmd("zm_jumpscare", ZM_Jumpscare, "ZM jumpscare Revolver Ocelot");
+    RegConsoleCmd("zm_jumpscare", ZM_Jumpscare, "ZM jumpscare");
+    RegConsoleCmd("zm_explosion", ZM_Explosion, "ZM Explosion");
     
 	// Commands -- admins only
 	RegAdminCmd("zm_addbank", zm_addbank, ADMFLAG_ROOT,"Add zombux to zombie master bank. Admins only.");
@@ -271,8 +272,11 @@ public void OnPluginStart()
     g_hCostTrapDoor = CreateConVar("zm_cost_trap_door", "100", "ZM cost to arm a panic door. -1 to disable.", FCVAR_PROTECTED, true, -1.0, true, 10000.0);
     g_hCostTrapDoor.AddChangeHook(ConVarChanged_Cvars_ZMenu);
 
-    g_hTraps = CreateConVar("zm_traps", "0", "Enable traps for Zombie Master.", FCVAR_PROTECTED, true, 0.0, true, 1.0);
+    g_hTraps = CreateConVar("zm_traps", "1", "Enable traps. 1: balanced traps. 2: balanced and experimental traps.", FCVAR_PROTECTED, true, 0.0, true, 2.0);
     g_hTraps.AddChangeHook(ConVarChanged_Cvars_ZMenu);
+
+    g_hCostExplosion = CreateConVar("zm_cost_explosion", "50", "Explosion trap cost. -1 to disable.", FCVAR_PROTECTED, true, -1.0, true, 1000.0);
+    g_hCostExplosion.AddChangeHook(ConVarChanged_Cvars_ZMenu);
 
     g_hCostTrapCar = CreateConVar("zm_cost_trap_car", "150", "ZM cost to arm an alarm car. -1 to disable.", FCVAR_PROTECTED, true, -1.0, true, 10000.0);
     g_hCostTrapCar.AddChangeHook(ConVarChanged_Cvars_ZMenu);
@@ -289,7 +293,7 @@ public void OnPluginStart()
     g_hTrapDoorBurst = CreateConVar("zm_trap_door_common_burst", "0", "Free angry commons spawned when a panic door is opened. 0 = none.", FCVAR_PROTECTED, true, 0.0, true, 50.0);
     g_hTrapDoorBurst.AddChangeHook(ConVarChanged_Cvars);
 
-    g_hCostTrapTornado = CreateConVar("zm_cost_trap_tornado", "600", "ZM cost to place a tornado. -1 to disable.", FCVAR_PROTECTED, true, -1.0, true, 10000.0);
+    g_hCostTrapTornado = CreateConVar("zm_cost_trap_tornado", "600", "ZM cost to place a tornado. Fully modeled. -1 to disable.", FCVAR_PROTECTED, true, -1.0, true, 10000.0);
     g_hCostTrapTornado.AddChangeHook(ConVarChanged_Cvars_ZMenu);
     g_hMaxTrapTornado = CreateConVar("zm_max_trap_tornado", "1", "Maximum simultaneously-active tornadoes.", FCVAR_PROTECTED, true, 0.0, true, 16.0);
     g_hMaxTrapTornado.AddChangeHook(ConVarChanged_Cvars_ZMenu);
@@ -1694,7 +1698,7 @@ public Action evtPlayerDeath(Event event, const char[] name, bool dontBroadcast)
         if (GetClientTeam(victim)==TEAM_SURVIVOR)
         {
             invalidate_survivor_cache(true);
-            if (IsValidClientZM()) EmitSoundToClient(zm_client,SOUND_SURVIVOR_DIED,victim,_,SNDLEVEL_GUNFIRE,_,SNDVOL_NORMAL,GetRandomInt(95,105));
+            if (IsValidClientZM()) EmitSoundToClient(zm_client,SOUND_SURVIVOR_DIED,victim,_,SNDLEVEL_GUNFIRE,_,0.5,GetRandomInt(95,105));
         }
         return Plugin_Continue;
     }
