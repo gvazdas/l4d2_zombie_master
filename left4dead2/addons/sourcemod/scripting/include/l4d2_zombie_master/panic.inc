@@ -48,7 +48,11 @@ void toggle_panic(bool state = true, bool overwrite = false, bool free = false)
 {
     if (ZM_finale_announced || g_iPanicCost<0 || L4D_IsSurvivalMode())
     {
-        update_hint("%T", "Panic is automatic", zm_client);
+        if (IsValidClientZM())
+        {
+            update_hint("%T", "Panic is automatic", zm_client);
+            ZM_Sound_Deny();
+        }
         if (panic)
         {
             disable_chase();
@@ -76,7 +80,11 @@ void toggle_panic(bool state = true, bool overwrite = false, bool free = false)
        {
            if ((bank-g_iPanicCost)<0)
            {
-              update_hint("%T", "Cannot afford", zm_client);
+              if (IsValidClientZM())
+              {
+                update_hint("%T", "Cannot afford", zm_client);
+                ZM_Sound_Deny();
+              }
               return;
            }
            bank -= g_iPanicCost;

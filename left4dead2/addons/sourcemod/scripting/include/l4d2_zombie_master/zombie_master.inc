@@ -121,6 +121,10 @@ static float HULL_MAXS_LOOK[3] = {HULL_DX,HULL_DX,HULL_DZ};
 #define MODEL_CHARGER "models/infected/charger.mdl"
 #define MODEL_TANK "models/infected/hulk.mdl"
 
+#define MODEL_WITCH "models/infected/witch.mdl"
+#define MODEL_COMMON "models/infected/common_shadertest.mdl"
+// common_morph_test common_test
+
 // C:\Steam\steamapps\common\Left 4 Dead 2\left4dead2\sound\ambient\alarms\perimeter_alarm.wav
 
 #define NUM_JUMPSCARES 6
@@ -298,6 +302,8 @@ int g_iLiveFallen;
 bool fallen_spawned;
 char zm_survivor_model[PLATFORM_MAX_PATH]; // keep zombie master survivor model in memory
 bool zm_draw_path;
+int entref_preview = INVALID_ENT_REFERENCE; // preview prop_dynamic zombie entity for spawner
+bool g_bLastWitchMoving;
 
 // Spawner_CacheSurvivorData: PVS (Potentially Visible Set) engine calls + survivor position an
 Handle hGetClusterForOrigin = null;
@@ -566,6 +572,10 @@ Menu menu_main,menu_common,menu_uncommon,menu_special,menu_boss,menu_cleanup,men
 #define SOUND_SURVIVOR_DIED "music/terror/theend.wav"
 
 // Freeze/Unfreeze audio cues
+//#define SOUND_FREEZE "music/scavenge/level_08_01.wav"
+#define SOUND_FREEZE1 "music/contagion/l4d1_quarantine_01.wav"
+#define SOUND_FREEZE2 "music/contagion/l4d1_quarantine_02.wav"
+#define SOUND_FREEZE3 "music/contagion/l4d1_quarantine_03.wav"
 
 // Special Spawn Sounds
 char sounds_SI[ZOMBIECLASS_TANK+1][2][PLATFORM_MAX_PATH];
@@ -2702,8 +2712,38 @@ void set_specials_frozen(bool state)
     {
         ZM_specials_frozen = state;
         freeze_team(state,TEAM_INFECTED);
-        if (IsValidClientZM()) create_special_menu();
+        if (IsValidClientZM())
+        {
+            create_special_menu();
+            if (specials_frozen && zm_stage==ZM_STARTED)
+            {
+                switch(GetRandomInt(1,3))
+                {
+                    case 1: EmitSoundToClient(zm_client,SOUND_FREEZE1);
+                    case 2: EmitSoundToClient(zm_client,SOUND_FREEZE2);
+                    default: EmitSoundToClient(zm_client,SOUND_FREEZE3);
+                }
+            }
+            else
+            {
+                StopSoundAllChans(zm_client,SOUND_FREEZE1);
+                StopSoundAllChans(zm_client,SOUND_FREEZE2);
+                StopSoundAllChans(zm_client,SOUND_FREEZE3);
+            }
+        }
     }
+}
+
+stock StopSoundAllChans(const int client, const char[] sound)
+{
+    StopSound(client, SNDCHAN_AUTO, sound);
+    StopSound(client, SNDCHAN_WEAPON, sound);
+    StopSound(client, SNDCHAN_VOICE, sound);
+    StopSound(client, SNDCHAN_ITEM, sound);
+    StopSound(client, SNDCHAN_BODY, sound);
+    StopSound(client, SNDCHAN_STREAM, sound);
+    StopSound(client, SNDCHAN_VOICE_BASE, sound);
+    StopSound(client, SNDCHAN_USER_BASE, sound);
 }
 
 Action zm_debug_player(int client, int args)
@@ -2712,6 +2752,7 @@ Action zm_debug_player(int client, int args)
     return Plugin_Continue;
 }
 
+// Fake Versus so Zombie Master can see infected ladders.
 void zm_fake_gamemode()
 {
     if (L4D_IsSurvivalMode()) FindConVar("mp_gamemode").ReplicateToClient(zm_client,"mutation15");
@@ -2842,7 +2883,12 @@ void JoinZM_Post(int client)
     
     entref_control = INVALID_ENT_REFERENCE;
     entref_delete = INVALID_ENT_REFERENCE;
-    
+    if (IsValidEntRef(entref_preview))
+    {
+        RemoveEntity(entref_preview);
+        entref_preview = INVALID_ENT_REFERENCE;
+    }
+
     if (zm_stage<ZM_PREP) set_bank_begin();
     
     ZMTeleport(zm_client,0);

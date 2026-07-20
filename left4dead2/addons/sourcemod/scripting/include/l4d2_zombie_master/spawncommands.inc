@@ -408,7 +408,11 @@ void ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
 
 	if (!g_bCvarAllow) return;
 	if (!(client==zm_client || client==0)) return;
-	if (client == zm_client) update_spawner_zombieclass(ZOMBIECLASS_WITCH);
+	if (client == zm_client)
+	{
+		update_spawner_zombieclass(ZOMBIECLASS_WITCH);
+		g_bLastWitchMoving = witch_type==WITCH_MOVING;
+	}
 
 	if (DEBUG) LogMessage("[zm] ZM_Witch");
 

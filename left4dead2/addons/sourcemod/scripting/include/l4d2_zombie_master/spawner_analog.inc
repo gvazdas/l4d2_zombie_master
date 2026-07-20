@@ -43,7 +43,60 @@ void update_ZM_spawner(const float target_pos[3], const float spawner_pos[3], co
         draw_pos[2] += HULL_DZ;
         TE_SetupBeamRingPoint(draw_pos,HULL_DX-2.0,HULL_DX+2.0,g_iLaser,g_iHalo,0,0,g_fUpdateRate*2.0,1.5,0.0,color,0,0);
         TE_SendToClient(zm_client);
-        
+
+        if (!IsValidEntRef(entref_preview))
+        {
+            int prop = CreateEntityByName("prop_dynamic");
+            if (IsValidEntity_Safe(prop))
+            {
+                SDKHook(prop, SDKHook_SetTransmit, OnTransmitPreview);
+                DispatchKeyValue(prop,"model",MODEL_COMMON);
+                DispatchSpawn(prop);
+                TeleportEntity(prop, spawner_pos, NULL_VECTOR, NULL_VECTOR);
+                SetEntProp(prop, Prop_Data, "m_nSolidType", 0);
+                SetEntityRenderMode(prop, view_as<RenderMode>(RENDER_TRANSCOLOR));
+                SetEntityRenderColor(prop, 255, 255, 255, 0);
+                entref_preview = EntIndexToEntRef(prop);
+            }
+        }
+        else
+        {
+            int zClass = get_spawner_zombieclass();
+            switch (zClass)
+            {
+                case ZOMBIECLASS_BOOMER: DispatchKeyValue(entref_preview,"model",MODEL_BOOMER);
+                case ZOMBIECLASS_CHARGER: DispatchKeyValue(entref_preview,"model",MODEL_CHARGER);
+                case ZOMBIECLASS_HUNTER: DispatchKeyValue(entref_preview,"model",MODEL_HUNTER);
+                case ZOMBIECLASS_JOCKEY: DispatchKeyValue(entref_preview,"model",MODEL_JOCKEY);
+                case ZOMBIECLASS_SMOKER: DispatchKeyValue(entref_preview,"model",MODEL_SMOKER);
+                case ZOMBIECLASS_SPITTER: DispatchKeyValue(entref_preview,"model",MODEL_SPITTER);
+                case ZOMBIECLASS_TANK: DispatchKeyValue(entref_preview,"model",MODEL_TANK);
+                case ZOMBIECLASS_WITCH: DispatchKeyValue(entref_preview,"model",MODEL_WITCH);
+                default: DispatchKeyValue(entref_preview,"model",MODEL_COMMON);
+            }
+            SetEntityMoveType(entref_preview, MOVETYPE_NONE);
+            SetEntProp(entref_preview, Prop_Send, "m_fEffects", 128);
+            DispatchSpawn(entref_preview);
+            TeleportEntity(entref_preview, spawner_pos, NULL_VECTOR, NULL_VECTOR);
+            SetEntityRenderMode(entref_preview, view_as<RenderMode>(RENDER_TRANSCOLOR));
+            SetEntityRenderColor(entref_preview, 255, 255, 255, 150);
+            int sequence;
+            switch (zClass)
+            {
+                case ZOMBIECLASS_COMMON: sequence = 16;
+                case ZOMBIECLASS_WITCH: sequence = g_bLastWitchMoving ? 10 : 4;
+                //case ZOMBIECLASS_BOOMER: sequence = 1;
+                //case ZOMBIECLASS_CHARGER: sequence = 3;
+                //case ZOMBIECLASS_HUNTER: sequence = 1;
+                //case ZOMBIECLASS_JOCKEY: sequence = 1;
+                //case ZOMBIECLASS_SMOKER: sequence = 8;
+                //case ZOMBIECLASS_SPITTER: sequence = 4;
+                //case ZOMBIECLASS_TANK: sequence = 28;
+                default: sequence = 2;
+            }
+            SetEntProp(entref_preview,Prop_Send,"m_nSequence",sequence);
+        }
+
         float t_now = GetGameTime();
         
         if ( (zm_spawner_state!=state && (t_now-t_last_spawner_sound)>=2.0) )
@@ -79,6 +132,11 @@ void update_ZM_spawner(const float target_pos[3], const float spawner_pos[3], co
     zm_spawner_state = state;
 } 
 
+Action OnTransmitPreview(int entity, int client)
+{
+   	if (client==zm_client) return Plugin_Continue;
+    return Plugin_Handled;
+}
 
 // Test if pos xy values are out of bounds for given navmesh center and size
 stock bool nav_xy_OOB(float pos[3], float center[3], float size[3])

@@ -54,7 +54,15 @@ void close_menus(int client)
     if (!IsValidClient(client)) return;
     InternalShowMenu(client, "\10", 1); // thanks to Zira
     CancelClientMenu(client, true, null);
-    if (client==zm_client) zm_menu_state = ZM_MENU_CLOSED;
+    if (client==zm_client)
+    {
+        zm_menu_state = ZM_MENU_CLOSED;
+        if (IsValidEntRef(entref_preview))
+        {
+            RemoveEntity(entref_preview);
+            entref_preview = INVALID_ENT_REFERENCE;
+        }
+    }
 }
 
 void open_menu(int client, int MENU=ZM_MENU_MAIN, int time=MENU_TIME_FOREVER)
@@ -88,7 +96,7 @@ void open_menu(int client, int MENU=ZM_MENU_MAIN, int time=MENU_TIME_FOREVER)
         }
         case ZM_MENU_SPECIAL:
         {
-            update_spawner_zombieclass(ZOMBIECLASS_BOOMER);
+            if (get_zombieclass_group(g_iLastZombieClass)!=GROUP_SPECIAL) update_spawner_zombieclass(ZOMBIECLASS_BOOMER);
             menu_special.Display(zm_client,time);
         }
         case ZM_MENU_BOSS: menu_boss.Display(zm_client,time);

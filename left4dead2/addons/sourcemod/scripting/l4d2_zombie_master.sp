@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.34i 2026-07-18"
+#define PLUGIN_VERSION 			"0.9.34j 2026-07-19"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -1797,6 +1797,9 @@ public void OnMapStart()
 	PluginPrecacheModel(MODEL_JOCKEY);
 	PluginPrecacheModel(MODEL_CHARGER);
 	PluginPrecacheModel(MODEL_TANK);
+
+    PluginPrecacheModel(MODEL_WITCH);
+    PluginPrecacheModel(MODEL_COMMON);
 	
 	PluginPrecacheModel(MODEL_RIOT); // Riot Police
 	PluginPrecacheModel(MODEL_RIOT2); // Riot Police
@@ -1818,6 +1821,9 @@ public void OnMapStart()
 	g_iLaser = PrecacheModel(VMT_LASERBEAM, true);
 	g_iHalo = PrecacheModel(VMT_HALO, true);
 	
+    PrecacheSound(SOUND_FREEZE1);
+    PrecacheSound(SOUND_FREEZE2);
+    PrecacheSound(SOUND_FREEZE3);
     PrecacheSound(SOUND_SURVIVOR_DIED);
 	PrecacheSound(SOUND_REWARD);
     PrecacheSound(SOUND_DRONE);
