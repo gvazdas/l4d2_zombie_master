@@ -303,7 +303,7 @@ bool fallen_spawned;
 char zm_survivor_model[PLATFORM_MAX_PATH]; // keep zombie master survivor model in memory
 bool zm_draw_path;
 int entref_preview = INVALID_ENT_REFERENCE; // preview prop_dynamic zombie entity for spawner
-bool g_bLastWitchMoving;
+bool g_bLastWitchMoving = true;
 
 // Spawner_CacheSurvivorData: PVS (Potentially Visible Set) engine calls + survivor position an
 Handle hGetClusterForOrigin = null;
@@ -644,7 +644,12 @@ void update_spawner_zombieclass(int zClass, bool revalidate = false)
         update_grid = revalidate && g_iSpawnerMode>0 && GridLib_IsReady() && IsValidClientZM();
     }
     g_iLastZombieClass = zClass;
-    if (update_grid) Grid_Update(); // this is expensive, could iterate over cells and check nav rules and context instead...
+    //g_iGridLastZombieClass = zClass;
+    if (update_grid)
+    {
+        //Grid_Update(); // this is expensive, could iterate over cells and check nav rules and context instead...
+        Grid_TimerUpdate(null,GetClientUserId(zm_client));
+    }
 }
 
 // Data structure for player stats
@@ -2592,56 +2597,64 @@ void update_entref_control(int new_entref, bool draw = false)
     
 }
 
+// Determine meaningful entity that zm_client is looking at. Select clients, infected and witches through objects.
 void update_ZM_looktarget(bool draw = true)
 {
-   if (!IsValidClientZM())
-   {
-       entref_lastlook = INVALID_ENT_REFERENCE;
-       return;
-   }
-   int target = GetClientAimTarget(zm_client, true);
-   if (!IsValidClient(target) || target==zm_client)
-   {
-       static float vAngles[3],vOrigin[3],vForward[3],vEnd[3];
-       GetClientEyePosition(zm_client,vOrigin);
-       GetClientEyeAngles(zm_client,vAngles);
-       GetAngleVectors(vAngles,vForward,NULL_VECTOR,NULL_VECTOR);
-       vEnd[0] = vOrigin[0] + (vForward[0] * 10000.0);
-       vEnd[1] = vOrigin[1] + (vForward[1] * 10000.0);
-       vEnd[2] = vOrigin[2] + (vForward[2] * 10000.0);
-       //Handle trace = TR_TraceRayFilterEx(vOrigin,vAngles,MASK_SHOT,RayType_Infinite,TraceFilter_Looktarget,_,TRACE_ENTITIES_ONLY);
-       Handle trace = TR_TraceHullFilterEx(vOrigin,vEnd,HULL_MINS_LOOK,HULL_MAXS_LOOK,MASK_SHOT,TraceFilter_Looktarget,zm_client,TRACE_ENTITIES_ONLY);
-       if(TR_DidHit(trace)) target = TR_GetEntityIndex(trace);
-       delete trace;
-   }
-   if (target>=0 && EntIndexToEntRef(target)==entref_lastlook) return;
-   entref_lastlook = INVALID_ENT_REFERENCE;
-   if (!IsValidEntity(target) || target==zm_client) return;
-   int health = GetEntProp(target,Prop_Data,"m_iHealth");
-   if (health<=0) return;
-   entref_lastlook = EntIndexToEntRef(target);
-   char class[16];
-   GetEntityClassname(target, class, sizeof(class));
-   if (class[0]=='i' || class[0]=='w' || class[0]=='p')
-   {
-       if (IsValidClient(target) && GetClientTeam(target)==TEAM_SURVIVOR && IsPlayerAlive(target))
-       {
-           if (!IsValidEntRef(g_iGlowList[target]) && L4D2_GetSurvivorVictim(zm_client)!=target) CreateZMGlow(target,false,true);
-       }
-       else if ( strcmp(class,"infected")==0 || strcmp(class,"witch")==0 || (IsValidClient(target) && GetClientTeam(target)==TEAM_INFECTED && IsFakeClient(target)) )
-       {
-      	 int entref_temp = EntIndexToEntRef(target);
-      	 if (draw && entref_temp!=entref_delete)
-      	 {
-      	    float vOrigin[3];
-      	    L4D_GetEntityWorldSpaceCenter(target,vOrigin);
-          	TE_SetupBeamRingPoint(vOrigin,50.0,0.0,g_iLaser,0,0,0,1.0,1.5,0.0,color_unit_select,0,0);
-            TE_SendToClient(zm_client);
-      	 }
-      	 entref_delete = entref_temp;
-      	 if (strcmp(class,"player")==0 && !L4D_IsPlayerIncapacitated(target)) update_entref_control(entref_temp,draw);
-       }
-   }
+    if (!IsValidClientZM())
+    {
+        entref_lastlook = INVALID_ENT_REFERENCE;
+        return;
+    }
+    int target = GetClientAimTarget(zm_client, true); // cheap check if aiming at a player
+    if (!IsValidClient(target) || target==zm_client)
+    {
+        static float vAngles[3],vOrigin[3],vForward[3],vEnd[3];
+        GetClientEyePosition(zm_client,vOrigin);
+        GetClientEyeAngles(zm_client,vAngles);
+        Handle trace = TR_TraceRayFilterEx(vOrigin,vAngles,MASK_SHOT,RayType_Infinite,TraceFilter_Looktarget,zm_client,TRACE_ENTITIES_ONLY); // direct line
+        bool hit = TR_DidHit(trace);
+        if(hit) target = TR_GetEntityIndex(trace);
+        delete trace;
+        if (!hit || target==zm_client) // try hull (less strict)
+        {
+            GetAngleVectors(vAngles,vForward,NULL_VECTOR,NULL_VECTOR);
+            vEnd[0] = vOrigin[0] + (vForward[0] * 10000.0);
+            vEnd[1] = vOrigin[1] + (vForward[1] * 10000.0);
+            vEnd[2] = vOrigin[2] + (vForward[2] * 10000.0);
+            trace = TR_TraceHullFilterEx(vOrigin,vEnd,HULL_MINS_LOOK,HULL_MAXS_LOOK,MASK_SHOT,TraceFilter_Looktarget,zm_client,TRACE_ENTITIES_ONLY);
+            hit = TR_DidHit(trace);
+            if(hit) target = TR_GetEntityIndex(trace);
+            delete trace;
+        }
+    }
+    if (target>=0 && EntIndexToEntRef(target)==entref_lastlook) return;
+    entref_lastlook = INVALID_ENT_REFERENCE;
+    if (!IsValidEntity(target) || target==zm_client) return;
+    int health = GetEntProp(target,Prop_Data,"m_iHealth");
+    if (health<=0) return;
+    entref_lastlook = EntIndexToEntRef(target);
+    static char class[16];
+    GetEntityClassname(target, class, sizeof(class));
+    if (class[0]=='i' || class[0]=='w' || class[0]=='p')
+    {
+        if (IsValidClient(target) && GetClientTeam(target)==TEAM_SURVIVOR && IsPlayerAlive(target))
+        {
+            if (!IsValidEntRef(g_iGlowList[target]) && L4D2_GetSurvivorVictim(zm_client)!=target) CreateZMGlow(target,false,true);
+        }
+        else if ( strcmp(class,"infected")==0 || strcmp(class,"witch")==0 || (IsValidClient(target) && GetClientTeam(target)==TEAM_INFECTED && IsFakeClient(target)) )
+        {
+            int entref_temp = EntIndexToEntRef(target);
+            if (draw && entref_temp!=entref_delete)
+            {
+                static float vOrigin[3];
+                L4D_GetEntityWorldSpaceCenter(target,vOrigin);
+                TE_SetupBeamRingPoint(vOrigin,50.0,0.0,g_iLaser,0,0,0,1.0,1.5,0.0,color_unit_select,0,0);
+                TE_SendToClient(zm_client);
+            }
+            entref_delete = entref_temp;
+            if (strcmp(class,"player")==0 && !L4D_IsPlayerIncapacitated(target)) update_entref_control(entref_temp,draw);
+        }
+    }
 }
 
 // deprecated, script scopes do not work as expected either on Linux or Windows
@@ -2879,6 +2892,7 @@ void JoinZM_Post(int client)
     pass_ZM(client);
     if (zm_timer == INVALID_HANDLE) zm_update();
     delete_preview_zombie();
+    g_bLastWitchMoving = true;
     open_menu(zm_client);
     recordpos = true;
     

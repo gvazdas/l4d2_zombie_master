@@ -40,12 +40,26 @@ void draw_preview_zombie(const float pos[3], const int state = SPAWNER_OK, const
         return;
     }
     
-    if (state!=SPAWNER_OK)
+    bool show = zm_menu_state>=ZM_MENU_COMMON && zm_menu_state<=ZM_MENU_BOSS;
+
+    if (state!=SPAWNER_OK || !show)
     {
         hide_preview_zombie();
         return;
     }
+    
     int zClass = get_spawner_zombieclass();
+    if (zm_menu_state==ZM_MENU_BOSS && zClass>=ZOMBIECLASS_SMOKER && zClass<=ZOMBIECLASS_CHARGER)
+    {
+        zClass = ZOMBIECLASS_WITCH;
+        update_spawner_zombieclass(ZOMBIECLASS_WITCH,true);
+    }
+    else if (zm_menu_state==ZM_MENU_SPECIAL && zClass==ZOMBIECLASS_TANK)
+    {
+        zClass = ZOMBIECLASS_BOOMER;
+        update_spawner_zombieclass(ZOMBIECLASS_BOOMER,true);
+    }
+
     switch (zClass)
     {
         case ZOMBIECLASS_BOOMER: DispatchKeyValue(entref_preview,"model",MODEL_BOOMER);

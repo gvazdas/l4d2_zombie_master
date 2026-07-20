@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.34k 2026-07-20"
+#define PLUGIN_VERSION 			"0.9.35 2026-07-20"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -94,6 +94,7 @@ public Plugin myinfo =
 // 10. zm_traps values: 0 1 2. 1 for finished traps, 2 for experimental traps
 // 11. Draw previews of units.
 // 12. More audio cues for ZM.
+// 13. Three-layer ZM looktarget.
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?

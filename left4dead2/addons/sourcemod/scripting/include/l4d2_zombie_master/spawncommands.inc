@@ -981,7 +981,8 @@ int ZM_Spawn_SI(int client, int ZOMBIECLASS, bool free = false, bool setpos=fals
 
         if (!setpos)
         {
-            if (client==zm_client && live_zombie_arr[ZOMBIECLASS]<=0 && ZOMBIECLASS!=ZOMBIECLASS_TANK) PlaySoundSI(ZOMBIECLASS,bot);
+            if (client==zm_client && live_zombie_arr[ZOMBIECLASS]<=0 && ZOMBIECLASS!=ZOMBIECLASS_TANK && !ZM_specials_frozen)
+				PlaySoundSI(ZOMBIECLASS,bot);
 			active_looktarget = true;
             add_available_zombie(ZOMBIECLASS,-1);
             L4D2_SetCustomAbilityCooldown(bot,1.0); // 1.0s cooldown to prevent abuse
