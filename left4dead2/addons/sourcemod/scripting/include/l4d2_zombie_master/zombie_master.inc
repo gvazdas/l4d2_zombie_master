@@ -2878,16 +2878,12 @@ void JoinZM_Post(int client)
     if (clients_timer==INVALID_HANDLE) clients_timer = CreateTimer(0.1,CountClients);
     pass_ZM(client);
     if (zm_timer == INVALID_HANDLE) zm_update();
+    delete_preview_zombie();
     open_menu(zm_client);
     recordpos = true;
     
     entref_control = INVALID_ENT_REFERENCE;
     entref_delete = INVALID_ENT_REFERENCE;
-    if (IsValidEntRef(entref_preview))
-    {
-        RemoveEntity(entref_preview);
-        entref_preview = INVALID_ENT_REFERENCE;
-    }
 
     if (zm_stage<ZM_PREP) set_bank_begin();
     
@@ -3004,6 +3000,7 @@ void QuitZM(int client, bool print = true)
        }
        Spawner_OnDisabled(zm_client);
        remove_all_ZM_glows();
+       delete_preview_zombie();
        zm_client = -1;
        zm_client_userid = -1;
        zm_menu_state = ZM_MENU_CLOSED;

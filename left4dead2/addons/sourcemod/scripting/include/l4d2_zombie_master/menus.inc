@@ -57,11 +57,7 @@ void close_menus(int client)
     if (client==zm_client)
     {
         zm_menu_state = ZM_MENU_CLOSED;
-        if (IsValidEntRef(entref_preview))
-        {
-            RemoveEntity(entref_preview);
-            entref_preview = INVALID_ENT_REFERENCE;
-        }
+        hide_preview_zombie();
     }
 }
 

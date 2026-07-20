@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.34j 2026-07-19"
+#define PLUGIN_VERSION 			"0.9.34k 2026-07-20"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -2328,6 +2328,7 @@ void EvtPlayerCallHelp(Event event, const char[] name, bool dontBroadcast)
 public void OnPluginEnd()
 {
 	PvsForce_Cleanup();
+    delete_preview_zombie();
     if (DEBUG) LogMessage("[zm] OnPluginEnd");
     zm_stage = ZM_END;
     if (IsValidClientZM()) QuitZM_Force(zm_client);
