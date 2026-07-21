@@ -1700,13 +1700,35 @@ public Action evtPlayerDeath(Event event, const char[] name, bool dontBroadcast)
     if (clients_timer==INVALID_HANDLE) clients_timer = CreateTimer(0.1,CountClients);
     
     request_update_glow(victim,true,0.0); 
+    static char sound[PLATFORM_MAX_PATH];
     
     if(GetClientTeam(victim)!=TEAM_INFECTED)
     {
         if (GetClientTeam(victim)==TEAM_SURVIVOR)
         {
             invalidate_survivor_cache(true);
-            if (IsValidClientZM()) EmitSoundToClient(zm_client,SOUND_SURVIVOR_DIED,victim,_,SNDLEVEL_GUNFIRE,_,0.5,GetRandomInt(95,105));
+            if (IsValidClientZM())
+            {
+                switch(GetRandomInt(0,1))
+                {
+                case 0: EmitSoundToClient(zm_client,SOUND_SURVIVOR_DIED,victim,_,SNDLEVEL_GUNFIRE,_,0.5,GetRandomInt(95,105));
+                default: EmitSoundToClient(zm_client,SOUND_SURVIVOR_DIED2,victim,_,SNDLEVEL_GUNFIRE,_,0.5,GetRandomInt(95,105));
+                }
+                int attacker = GetClientOfUserId(event.GetInt("attacker"));
+                if (attacker==zm_client) // play sob if zm killed a survivor
+                {
+                    switch (GetRandomInt(1,5))
+                    {
+                        case 1: sound=SOUND_SCARY1;
+                        case 2: sound=SOUND_SCARY2;
+                        case 3: sound=SOUND_SCARY3;
+                        case 4: sound=SOUND_SCARY4;
+                        default: sound=SOUND_SCARY5;
+                    }
+                    //EmitSoundToAll(sound,zm_client,SNDCHAN_VOICE,SNDLEVEL_GUNFIRE,_,SNDVOL_NORMAL);
+                    CreateTimer(0.1,ZM_Delayed_Cry,sound,TIMER_FLAG_NO_MAPCHANGE);
+                }
+            }
         }
         return Plugin_Continue;
     }
@@ -1759,11 +1781,24 @@ public Action evtPlayerDeath(Event event, const char[] name, bool dontBroadcast)
         SetEntityMoveType(zm_client, MOVETYPE_NONE);
         RequestFrame(ZM_FixCamera,true);
         if (zClass==ZOMBIECLASS_TANK) CreateTimer(1.0,stop_tankmusic,TIMER_FLAG_NO_MAPCHANGE);
+        switch (GetRandomInt(0,1)) // zm just died, make them sound upset.
+        {
+            case 0: sound = SOUND_ZM_ANGRY;
+            default: sound = SOUND_ZM_ANGRY2;
+        }
+        CreateTimer(0.1,ZM_Delayed_Cry,sound,TIMER_FLAG_NO_MAPCHANGE);
     }
     
     remove_ZM_glow(victim);
 
 	return Plugin_Continue;
+}
+
+Action ZM_Delayed_Cry(Handle timer, char[] sound)
+{
+    if (!IsValidClientZM()) return Plugin_Stop;
+    EmitSoundToAll(sound,zm_client,SNDCHAN_VOICE,SNDLEVEL_GUNFIRE,_,SNDVOL_NORMAL,GetRandomInt(95,105),_,_,_,false);
+    return Plugin_Stop;
 }
 
 public Action L4D_OnVomitedUpon(int victim, int &attacker, bool &boomerExplosion)
@@ -1829,10 +1864,13 @@ public void OnMapStart()
 	g_iLaser = PrecacheModel(VMT_LASERBEAM, true);
 	g_iHalo = PrecacheModel(VMT_HALO, true);
 	
+    PrecacheSound(SOUND_ZM_ANGRY);
+    PrecacheSound(SOUND_ZM_ANGRY2);
     PrecacheSound(SOUND_FREEZE1);
     PrecacheSound(SOUND_FREEZE2);
     PrecacheSound(SOUND_FREEZE3);
     PrecacheSound(SOUND_SURVIVOR_DIED);
+    PrecacheSound(SOUND_SURVIVOR_DIED2);
 	PrecacheSound(SOUND_REWARD);
     PrecacheSound(SOUND_DRONE);
     PrecacheSound(SOUND_DENY);

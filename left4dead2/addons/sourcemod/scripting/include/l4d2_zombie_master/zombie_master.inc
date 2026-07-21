@@ -144,8 +144,15 @@ static float HULL_MAXS_LOOK[3] = {HULL_DX,HULL_DX,HULL_DZ};
 
 #define SOUND_TORNADO_ALARM "ambient/alarms/perimeter_alarm.wav"
 
-#define SOUND_DENY "player/suit_denydevice.wav"
 #define SOUND_DRONE "music/terror/walkingdead.wav"
+#define SOUND_DRONE2 "music/glimpse/aglimpseofdeath_01.wav"
+#define SOUND_DRONE3 "music/glimpse/aglimpseofdeath_02.wav"
+#define SOUND_DRONE4 "music/glimpse/aglimpseofdeath_03.wav"
+#define SOUND_DRONE5 "music/infection/infection_09_01.wav"
+#define SOUND_DRONE6 "music/infection/infection_10_01.wav"
+#define SOUND_DRONE7 "music/infection/infection_11_01.wav"
+
+#define SOUND_DENY "player/suit_denydevice.wav"
 #define SOUND_READY "ui/critical_event_1.wav"
 #define SOUND_OFFER "ui/pickup_misc42.wav"
 #define SOUND_REWARD "ui/beep_synthtone01.wav"
@@ -192,6 +199,10 @@ static float HULL_MAXS_LOOK[3] = {HULL_DX,HULL_DX,HULL_DZ};
 #define SOUND_SCARY3 "ambient/creatures/town_scared_breathing2.wav"
 #define SOUND_SCARY4 "ambient/creatures/town_scared_sob1.wav"
 #define SOUND_SCARY5 "ambient/creatures/town_scared_sob2.wav"
+
+// When ZM dies as special infected
+#define SOUND_ZM_ANGRY "ambient/levels/caves/dist_growl1.wav"
+#define SOUND_ZM_ANGRY2 "ambient/levels/citadel/strange_talk1.wav"
 
 #define VMT_LASERBEAM "sprites/laserbeam.vmt"
 #define VMT_HALO "sprites/halo.vmt"
@@ -571,11 +582,11 @@ Menu menu_main,menu_common,menu_uncommon,menu_special,menu_boss,menu_cleanup,men
 
 // Survivor Died
 #define SOUND_SURVIVOR_DIED "music/terror/theend.wav"
+#define SOUND_SURVIVOR_DIED2 "music/terror/theend_l4d1.wav"
 
 // Freeze/Unfreeze audio cues
-//#define SOUND_FREEZE "music/scavenge/level_08_01.wav"
-#define SOUND_FREEZE1 "music/contagion/l4d1_quarantine_01.wav"
-#define SOUND_FREEZE2 "music/contagion/l4d1_quarantine_02.wav"
+#define SOUND_FREEZE1 "music/contagion/tls_quarantine_01.wav"
+#define SOUND_FREEZE2 "music/scavenge/level_10_01.wav"
 #define SOUND_FREEZE3 "music/contagion/l4d1_quarantine_03.wav"
 
 // Special Spawn Sounds

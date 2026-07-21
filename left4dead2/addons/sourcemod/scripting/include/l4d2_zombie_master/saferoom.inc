@@ -204,7 +204,7 @@ Action zm_start(int client, int args)
             if (zm_stage<ZM_STARTED && IsValidEntRef(g_iLockedDoor) && !force_started)
             {
                 int random = GetRandomInt(1,5);
-                char sound[64];
+                static char sound[64];
                 switch (random)
                 {
                     case 1: {sound=SOUND_SCARY1;}
