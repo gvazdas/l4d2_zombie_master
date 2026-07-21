@@ -304,6 +304,7 @@ char zm_survivor_model[PLATFORM_MAX_PATH]; // keep zombie master survivor model 
 bool zm_draw_path;
 int entref_preview = INVALID_ENT_REFERENCE; // preview prop_dynamic zombie entity for spawner
 bool g_bLastWitchMoving = true;
+float t_finale_change; // track last finale stage change so they don't last more than 5 minutes each.
 
 // Spawner_CacheSurvivorData: PVS (Potentially Visible Set) engine calls + survivor position an
 Handle hGetClusterForOrigin = null;
@@ -1084,30 +1085,30 @@ stock bool FilterSpawner(int entity, int mask, int self)
 	return true;
 }
 
-stock void get_finale_label(int finaleType, char label[32])
+stock void get_finale_label(const int finaleType, char[] label, int maxlen = 32)
 {
     switch (finaleType)
     {
-        case 0: {label = "FINALE_GAUNTLET_1";} // minimum 30s
-        case 1: {label = "FINALE_HORDE_ATTACK_1";} // no interrupt
-        case 2: {label = "FINALE_HALFTIME_BOSS";} // minimum 30s and tank must die
-        case 3: {label = "FINALE_GAUNTLET_2";} // minimum 30s
-        case 4: {label = "FINALE_HORDE_ATTACK_2";} // no interrupt
-        case 5: {label = "FINALE_FINAL_BOSS";} // minimum 30s and tank must die
-        case 6: {label = "FINALE_HORDE_ESCAPE";} //infinite
-        case 7: {label = "FINALE_CUSTOM_PANIC";} // minimum 30s
-        case 8: {label = "FINALE_CUSTOM_TANK";} // minimum 30s and tank dead
-        case 9: {label = "FINALE_CUSTOM_SCRIPTED";} // ??? could do anything
-        case 10: {label = "FINALE_CUSTOM_DELAY";} // ??? could do anything
-        case 11: {label = "FINALE_CUSTOM_CLEAROUT";} // let map manage this
-        case 12: {label = "FINALE_GAUNTLET_START";} // let it through
-        case 13: {label = "FINALE_GAUNTLET_HORDE";} // minimum 30s
-        case 14: {label = "FINALE_GAUNTLET_HORDE_BONUSTIME";} // minimum 30s
-        case 15: {label = "FINALE_GAUNTLET_BOSS_INCOMING";} // let it through
-        case 16: {label = "FINALE_GAUNTLET_BOSS";} // minimum 30s and tank must die
-        case 17: {label = "FINALE_GAUNTLET_ESCAPE";} // infinite
-        case 18: {label = "FINALE_NONE";} // let it through
-        default: {label = "unknown";} // let it through
+        case 0: strcopy(label, maxlen, "Gauntlet"); // minimum 30s
+        case 1: strcopy(label, maxlen, "Horde"); // no interrupt
+        case 2: strcopy(label, maxlen, "Boss 1"); // minimum 30s and tank must die
+        case 3: strcopy(label, maxlen, "Gauntlet"); // minimum 30s
+        case 4: strcopy(label, maxlen, "Horde"); // no interrupt
+        case 5: strcopy(label, maxlen, "Boss 2"); // minimum 30s and tank must die
+        case 6: strcopy(label, maxlen, "Escape"); //infinite
+        case 7: strcopy(label, maxlen, "PANIC"); // minimum 30s
+        case 8: strcopy(label, maxlen, "Boss"); // minimum 30s and tank dead
+        case 9: strcopy(label, maxlen, "Custom"); // ??? could do anything
+        case 10: strcopy(label, maxlen, "Pause"); // ??? could do anything
+        case 11: strcopy(label, maxlen, "Clearout"); // let map manage this
+        case 12: strcopy(label, maxlen, "Start"); // let it through
+        case 13: strcopy(label, maxlen, "Horde"); // minimum 30s
+        case 14: strcopy(label, maxlen, "Horde"); // minimum 30s
+        case 15: strcopy(label, maxlen, "Boss"); // let it through
+        case 16: strcopy(label, maxlen, "Boss"); // minimum 30s and tank must die
+        case 17: strcopy(label, maxlen, "Escape"); // infinite
+        case 18: strcopy(label, maxlen, "None"); // let it through
+        default: strcopy(label, maxlen, "Unknown"); // let it through
     }
 }
 
@@ -2110,20 +2111,22 @@ void set_zm_stage(int stage, bool override = false)
     if (override || zm_stage<stage) zm_stage = stage;
 }
 
-bool can_change_finale_stage()
+// if hud: ignore SI limits, for determining if ZM needs to spend more bank for stage to change.
+bool can_change_finale_stage(const bool hud = false)
 {
-    if (!ZM_finale_announced) return false;
-    if (zm_stage>=ZM_END) return false;
+    if (!ZM_finale_announced) return true;
+    if (zm_stage>=ZM_END) return true;
     if (!holdfinale) return true;
     int current = L4D2_GetCurrentFinaleStage();
     if (current==FINALE_CUSTOM_SCRIPTED || current==FINALE_CUSTOM_DELAY || current==FINALE_CUSTOM_CLEAROUT)
         return true;
+    if (FloatAbs(GetGameTime()-t_finale_change)>=360.0) return true; // 5 minutes
     int cheapest = cheapest_zombie();
     if (cheapest < 0 || cheapest > bank) return true;
     if (bank<=0 || bank<g_iBonusFinaleStage) return true;
     if ( bank>=(0.5*g_iBonusFinaleStage*g_iAliveSurvivors) ) return false;
-    if ( live_SI<=1 && live_zombie_arr[ZOMBIECLASS_TANK]<=0 ) return true;
-    return false;
+    if (hud) return true;
+    return live_SI<=1 && live_zombie_arr[ZOMBIECLASS_TANK]<=0;
 }
 
 // Find cheapest zombie in ZM arsenal.

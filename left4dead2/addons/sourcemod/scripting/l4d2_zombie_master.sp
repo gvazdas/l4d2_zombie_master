@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.35 2026-07-20"
+#define PLUGIN_VERSION 			"0.9.35a 2026-07-20"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -95,6 +95,8 @@ public Plugin myinfo =
 // 11. Draw previews of units.
 // 12. More audio cues for ZM.
 // 13. Three-layer ZM looktarget.
+// 14. Finale: prints finale stages instead of PANIC
+// 15. Hardcoded 5 minute timer for finale stage change if ZM has not used enough bank.
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
@@ -1505,7 +1507,7 @@ public Action L4D2_OnChangeFinaleStage(int &finaleType, const char[] arg)
 {	
 	if (!g_bCvarAllow || zm_stage!=ZM_STARTED || finaleType==FINALE_NONE) return Plugin_Continue;
 	int current = L4D2_GetCurrentFinaleStage();
-	char current_label[32], label[32]; //
+	static char current_label[32], label[32]; //
 	get_finale_label(current,current_label);
 	get_finale_label(finaleType,label);
 	int pending_mob = L4D2Direct_GetPendingMobCount();
@@ -1519,8 +1521,12 @@ public void L4D2_OnChangeFinaleStage_Post(int finaleType, const char[] arg)
 {   
     if (!g_bCvarAllow || L4D_IsSurvivalMode() || !ZM_finale_announced) return;
 
-    if (finaleType==FINALE_CUSTOM_DELAY) return;
-    
+    if (finaleType==FINALE_CUSTOM_DELAY)
+    {
+        //if (IsValidClientZM()) PrintToChat(zm_client, "[zm] Finale stage will change soon..."); 
+        return;
+    }
+
     if ( IsValidClientZM() && (finaleType==FINALE_HALFTIME_BOSS || finaleType==FINALE_FINAL_BOSS
                             || finaleType==FINALE_GAUNTLET_BOSS || finaleType==FINALE_CUSTOM_TANK ) )
         EmitSoundToClient(zm_client,SOUND_READY,_,_,_,_,_,GetRandomInt(95,105));
@@ -1542,6 +1548,7 @@ public void L4D2_OnChangeFinaleStage_Post(int finaleType, const char[] arg)
         }
         t_finale = t_now;
     }
+    t_finale_change = t_now;
     
     prev_finaleType = finaleType;
     

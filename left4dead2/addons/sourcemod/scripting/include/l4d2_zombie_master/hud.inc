@@ -101,7 +101,16 @@ Action perform_HUD_update(Handle timer = null)
             float panic_left;
             if (ZM_finale_announced || L4D_IsSurvivalMode()) panic_left = 0.0;
             else panic_left = g_fPanicDuration - (t_now - t_last_panic);
-            if (panic_left<=0.0) Format(panic_str, sizeof(panic_str), "%T\n", "PANIC ON", zm_client);
+
+            if (ZM_finale_announced)
+            {
+                int stage = L4D2_GetCurrentFinaleStage();
+                if (stage == FINALE_CUSTOM_PANIC && can_change_finale_stage(true)) g_sBuffer = "Clearout";
+                else get_finale_label(stage,g_sBuffer);
+                TrimString(g_sBuffer);
+                Format(panic_str, sizeof(panic_str), "Finale %s\n", g_sBuffer);
+            }
+            else if (panic_left<=0.0) Format(panic_str, sizeof(panic_str), "%T\n", "PANIC ON", zm_client);
             else
             {
                 Format(panic_str, sizeof(panic_str), "%T\n", "PANIC ON time", zm_client, panic_left);
@@ -173,7 +182,7 @@ Action perform_HUD_update(Handle timer = null)
        
        if (IsValidClient(client_offer))
        {
-           char name[MAX_NAME_LENGTH]; 
+           static char name[MAX_NAME_LENGTH]; 
            GetClientName(client_offer,name,sizeof(name));
            int timeleft = RoundFloat(g_fFairQueueWait - (t_now - t_offer));
            if (timeleft<0) timeleft = 0;
