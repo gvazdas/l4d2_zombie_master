@@ -164,10 +164,26 @@ void freeze_player(int client, bool state = true, int team = TEAM_SURVIVOR)
             {
                 if (zClass==ZOMBIECLASS_TANK)
                 {
+                    //int target_survivor = L4D_GetHighestFlowSurvivor();
                     //if (hTankLeaveStasis) SDKCall(hTankLeaveStasis,client);
-                    SetEntProp(client, Prop_Send, "m_hasVisibleThreats",1);
-                    SetEntPropEnt(client, Prop_Send, "m_lookatPlayer",GetRandomSurvivor(1,1));
-                    SetEntProp(client, Prop_Send, "m_zombieState",1);
+                    //AcceptEntityInput(client, "Activate");
+                    //AcceptEntityInput(client, "Enable");
+                    //SetEntProp(client, Prop_Send, "m_isGhost", 0);
+                    //SetEntProp(client, Prop_Send, "m_lifeState", 0);
+                    //SetEntProp(client, Prop_Send, "m_zombieState",1);
+                    //L4D2_CommandABot(client,target_survivor,BOT_CMD_ATTACK);
+                    //SDKHooks_TakeDamage(client, target_survivor, target_survivor, 1.0, DMG_SLASH);
+                    //SetEntProp(client, Prop_Send, "m_hasVisibleThreats",1);
+                    //SetEntPropEnt(client, Prop_Send, "m_lookatPlayer",GetRandomSurvivor(1,1));
+                    //SetEntProp(client, Prop_Send, "m_zombieState",1);
+                    //int health = GetEntProp(client,Prop_Data,"m_iHealth");
+                    //if (health>0)
+                    //{
+                    //    SetEntProp(client,Prop_Data,"m_iHealth",health+1);
+                    //    SDKHooks_TakeDamage(client,target_survivor,target_survivor,1.0,DMG_BURN);
+                    //}
+                    //SetEntPropEnt(client, Prop_Send, "m_lookatPlayer",target_survivor);
+                    //SetEntProp(client, Prop_Send, "m_hasVisibleThreats", 1);
                 }
             }
 		}
@@ -496,22 +512,4 @@ void update_dynamic_tank()
         costs_SI[ZOMBIECLASS_TANK] = new_cost;
         create_boss_menu();
     }
-}
-
-Action stop_tankmusic(Handle timer=null)
-{
-    if (live_zombie_arr[ZOMBIECLASS_TANK]>0) return Plugin_Stop;
-    for (int i=1;i<=MaxClients;i++)
-	{
-        if (!IsClientInGame(i) || IsFakeClient(i)) continue;
- 		L4D_StopMusic(i, "Event.Tank");
- 		L4D_StopMusic(i, "Event.TankMidpoint");
- 		L4D_StopMusic(i, "Event.TankMidpoint_Metal");
- 		L4D_StopMusic(i, "Event.TankBrothers");
- 		L4D_StopMusic(i, "C2M5.RidinTank1");
- 		L4D_StopMusic(i, "C2M5.RidinTank2");
- 		L4D_StopMusic(i, "C2M5.BadManTank1");
- 		L4D_StopMusic(i, "C2M5.BadManTank2");
-    }
-    return Plugin_Stop;
 }

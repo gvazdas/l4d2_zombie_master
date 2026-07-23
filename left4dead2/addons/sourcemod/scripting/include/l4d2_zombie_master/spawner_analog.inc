@@ -16,8 +16,13 @@ bool g_bLastDoorValid = false;
 bool g_bSpawnerFilterZM = false; // mark cells invisible to ZM as invalid?
 
 // Draw transparent zombie preview at pos
-void draw_preview_zombie(const float pos[3], const int state = SPAWNER_OK, const int alpha = 125)
+void draw_preview_zombie(const float pos[3], const int state = SPAWNER_OK, const int alpha = 150)
 {
+    if (!g_hPreview.BoolValue)
+    {
+        delete_preview_zombie();
+        return;
+    }
     if (!IsValidEntRef(entref_preview))
     {
         int prop = CreateEntityByName("prop_dynamic");
@@ -44,21 +49,68 @@ void draw_preview_zombie(const float pos[3], const int state = SPAWNER_OK, const
 
     if (state!=SPAWNER_OK || !show)
     {
-        hide_preview_zombie();
+        delete_preview_zombie();
         return;
     }
     
     int zClass = get_spawner_zombieclass();
-    if (zm_menu_state==ZM_MENU_BOSS && zClass>=ZOMBIECLASS_SMOKER && zClass<=ZOMBIECLASS_CHARGER)
+
+    // ZM_MENU_COMMON or ZM_MENU_UNCOMMON -> only ZOMBIECLASS_COMMON
+    // ZM_MENU_BOSS -> ZOMBIECLASS_WITCH, ZOMBIECLASS_TANK or ZOMBIECLASS_COMMON
+    // ZM_MENU_SPECIAL -> ZOMBIECLASS_SMOKER thru ZOMBIECLASS_CHARGER
+
+    if (zm_menu_state==ZM_MENU_COMMON || zm_menu_state==ZM_MENU_UNCOMMON)
     {
-        zClass = ZOMBIECLASS_WITCH;
-        update_spawner_zombieclass(ZOMBIECLASS_WITCH,true);
+        zClass = ZOMBIECLASS_COMMON;
     }
-    else if (zm_menu_state==ZM_MENU_SPECIAL && zClass==ZOMBIECLASS_TANK)
+    else if (zm_menu_state==ZM_MENU_BOSS)
     {
-        zClass = ZOMBIECLASS_BOOMER;
-        update_spawner_zombieclass(ZOMBIECLASS_BOOMER,true);
+        bool change = !gamerules_allow_zClass(zClass) || (zClass>=ZOMBIECLASS_SMOKER && zClass<=ZOMBIECLASS_CHARGER);
+        if (change)
+        {
+            if (gamerules_allow_zClass(ZOMBIECLASS_WITCH)) zClass = ZOMBIECLASS_WITCH;
+            else if (gamerules_allow_zClass(ZOMBIECLASS_TANK)) zClass = ZOMBIECLASS_TANK;
+            else if (gamerules_allow_zClass(ZOMBIECLASS_COMMON)) zClass = ZOMBIECLASS_COMMON;
+        }
     }
+    else if (zm_menu_state==ZM_MENU_SPECIAL)
+    {
+        if (zClass<ZOMBIECLASS_SMOKER || zClass>ZOMBIECLASS_CHARGER)
+        {
+            zClass = -1; // pick random SI
+        }
+    }
+    
+    if (!gamerules_allow_zClass(zClass))
+    {
+        // Select viable class for spawning
+        ArrayList classes = new ArrayList();
+        for (int i = ZOMBIECLASS_COMMON; i <= ZOMBIECLASS_TANK; i++)
+        {
+            if (!gamerules_allow_zClass(i)) continue;
+            if (zm_menu_state==ZM_MENU_SPECIAL) // Specials only, no Tanks
+            {
+                if (get_zombieclass_group(zClass)!=GROUP_SPECIAL) continue;
+                if (i==ZOMBIECLASS_TANK) continue;
+            }
+            if (zm_menu_state==ZM_MENU_BOSS && (zClass>=ZOMBIECLASS_SMOKER && zClass<=ZOMBIECLASS_CHARGER)) continue;
+            classes.Push(i);
+        }
+        if (classes.Length>0)
+        {
+            if (classes.Length==1) zClass = classes.Get(0);
+            else zClass = classes.Get(GetRandomInt(0,classes.Length-1));
+        }
+        delete classes;
+    }
+
+    if (!gamerules_allow_zClass(zClass))
+    {
+        delete_preview_zombie();
+        return;
+    }
+
+    if (g_iLastZombieClass!=zClass) update_spawner_zombieclass(zClass,true);
 
     switch (zClass)
     {
@@ -70,17 +122,24 @@ void draw_preview_zombie(const float pos[3], const int state = SPAWNER_OK, const
         case ZOMBIECLASS_SPITTER: DispatchKeyValue(entref_preview,"model",MODEL_SPITTER);
         case ZOMBIECLASS_TANK: DispatchKeyValue(entref_preview,"model",MODEL_TANK);
         case ZOMBIECLASS_WITCH: DispatchKeyValue(entref_preview,"model",MODEL_WITCH);
-        default: DispatchKeyValue(entref_preview,"model",MODEL_COMMON);
+        default:
+        {
+            static char common_model[PLATFORM_MAX_PATH];
+            float t_now = GetGameTime();
+            if (FloatAbs(t_last_infected_model-t_now)>=1.0)
+            {
+                t_last_infected_model = t_now;
+                GetRandomInfectedModel(common_model);
+            }
+            if (common_model[0]==0) common_model = MODEL_COMMON;
+            DispatchKeyValue(entref_preview,"model",common_model);
+        }
     }
     DispatchSpawn(entref_preview);
     TeleportEntity(entref_preview, pos, NULL_VECTOR, NULL_VECTOR);
     SetEntityRenderMode(entref_preview, view_as<RenderMode>(RENDER_TRANSCOLOR));
     //SetEntityRenderFx(entref_preview,view_as<RenderFx>(RENDERFX_PULSE_SLOW));
 
-    //static int color[4];
-    //if (state==SPAWNER_OK) color = color_allowed;
-    //else if (state>SPAWNER_NAV) color = color_conditional;
-    //else color = color_blocked;
     SetEntityRenderColor(entref_preview,255,255,255,alpha);
 
     int sequence;
@@ -112,6 +171,29 @@ void delete_preview_zombie()
 {
     if (IsValidEntRef(entref_preview)) RemoveEntity(entref_preview);
     entref_preview = INVALID_ENT_REFERENCE;
+}
+
+// Check if game rules allow zombie class to spawn
+stock bool gamerules_allow_zClass(const int zClass)
+{
+    if (zClass<ZOMBIECLASS_COMMON || zClass>ZOMBIECLASS_TANK) return false;
+    if (max_zombie_arr[zClass]<=0) return false;
+    switch (zClass)
+    {
+        case ZOMBIECLASS_COMMON:
+        {
+            return (g_iCostCommon>=0 || g_iCostUncommon>=0) && g_hMaxCommons.IntValue>0;
+        }
+        case ZOMBIECLASS_WITCH:
+        {
+            return g_iCostWitchMoving>=0 || g_iCostWitchStatic>=0;
+        }
+        default:
+        {
+            if (zClass==ZOMBIECLASS_TANK && g_hNoTanks.BoolValue) return false;
+            return costs_SI[zClass]>=0;
+        }
+    }
 }
 
 /**

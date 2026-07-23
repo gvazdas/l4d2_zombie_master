@@ -317,6 +317,12 @@ int entref_preview = INVALID_ENT_REFERENCE; // preview prop_dynamic zombie entit
 bool g_bLastWitchMoving = true;
 float t_finale_change; // track last finale stage change so they don't last more than 5 minutes each.
 
+//Handle hTankLeaveStasis; // tank ambush
+
+DynamicDetour hPlayMusic; // for tank music and stop sound
+bool g_bMusicMonitor,g_bMusicTankDetour; // track detour and post hook states
+char musicStringTank[PLATFORM_MAX_PATH]; // last tank music that should be played
+
 // Spawner_CacheSurvivorData: PVS (Potentially Visible Set) engine calls + survivor position an
 Handle hGetClusterForOrigin = null;
 Handle hGetPVSForCluster = null;
@@ -456,7 +462,7 @@ ConVar g_hBankRateBase, g_hBankRatePlayer, g_hBankInitial, g_hBankInitialPlayer,
        g_hCommonRate, g_hWitchCooldown, g_hTankCooldown, g_hSpitterCooldown, g_hMinFinaleStage, g_hPanicDuration, g_hFairQueue, g_hFairQueueWait, g_hPanicRateMultiplier,
        g_hMenuTimeout, g_hDiscountTank, g_hMemes, g_hClownGlow, g_hForceCommon, g_hHoldFinale, g_hZMGamemode, g_hVomitCommons, g_hAllowFreeze,
        //g_hGridSearchRadius,
-       g_hGrid, g_hSpawnerMode, g_hPanicRefill, g_hCursed, g_hGridCooldown, g_hTraps, g_hJumpscare, g_hGnome;
+       g_hGrid, g_hSpawnerMode, g_hPanicRefill, g_hCursed, g_hGridCooldown, g_hTraps, g_hJumpscare, g_hGnome, g_hPreview;
 ConVar g_hCostTrapDoor, g_hCostTrapCar, g_hMaxTrapDoor, g_hMaxTrapCar, g_hTrapCooldown, g_hTrapDoorBurst, g_hCostExplosion;
 ConVar g_hCostTrapTornado, g_hMaxTrapTornado, g_hTornadoDuration, g_hTornadoRadius, g_hTornadoHeight, g_hTornadoGrace;
 
@@ -586,7 +592,7 @@ Menu menu_main,menu_common,menu_uncommon,menu_special,menu_boss,menu_cleanup,men
 
 // Freeze/Unfreeze audio cues
 #define SOUND_FREEZE1 "music/contagion/tls_quarantine_01.wav"
-#define SOUND_FREEZE2 "music/scavenge/level_10_01.wav"
+#define SOUND_FREEZE2 "music/scavenge/level_09_01.wav"
 #define SOUND_FREEZE3 "music/contagion/l4d1_quarantine_03.wav"
 
 // Special Spawn Sounds
@@ -634,19 +640,19 @@ int g_iLastZombieClass = -1; // ZM spawner context
 int get_spawner_zombieclass()
 {
    	int zClass = g_iLastZombieClass;
-   	if (zClass<0)
-   	{
-       	if (zm_menu_state==ZM_MENU_COMMON || zm_menu_state==ZM_MENU_UNCOMMON)
-           	zClass = ZOMBIECLASS_COMMON;
-        else
-            zClass = ZOMBIECLASS_BOOMER;
-    }
+   	//if (zClass<ZOMBIECLASS_COMMON || zClass>ZOMBIECLASS_TANK)
+   	//{
+    //   	if (zm_menu_state==ZM_MENU_COMMON || zm_menu_state==ZM_MENU_UNCOMMON)
+    //       	zClass = ZOMBIECLASS_COMMON;
+    //    else
+    //        zClass = ZOMBIECLASS_BOOMER;
+    //}
     return zClass;
 }
 
 // Update spawner zombie class. Invalidate current grid cells.
 // revalidate: if grid spawner is active, immediately revalidate
-void update_spawner_zombieclass(int zClass, bool revalidate = false)
+stock void update_spawner_zombieclass(int zClass, bool revalidate = false)
 {
     bool update_grid = false;
     if (get_zombieclass_group(zClass)!=get_zombieclass_group(g_iGridLastZombieClass))
@@ -2498,6 +2504,7 @@ void start_zm_round(bool play_sound = true)
      {
         PrintHintText(zm_client, "%t", "Round started");
         stop_sound(zm_client);
+        FreezeSound(zm_client,ZM_specials_frozen && specials_frozen);
      }
      update_hint("%T", "Round started", zm_client);
      if (play_sound) EmitSoundToAll(SOUND_START);
@@ -2554,11 +2561,11 @@ void start_zm_round(bool play_sound = true)
  //create_main_menu();
  create_special_menu();
  //scope_changed = false;
- update_director_script_scopes(false);
+ update_director_script_scopes(false); // this is broken on either Windows or Linux
  fair_exhausted = true;
  //scope_changed = false;
  set_force_start(false);
- 
+ update_tank_music();
 }
 
 void update_ZM_looktarget_HP(int health_manual = -1)
@@ -2742,22 +2749,30 @@ void set_specials_frozen(bool state)
         if (IsValidClientZM())
         {
             create_special_menu();
-            if (specials_frozen && zm_stage==ZM_STARTED)
-            {
-                switch(GetRandomInt(1,3))
-                {
-                    case 1: EmitSoundToClient(zm_client,SOUND_FREEZE1);
-                    case 2: EmitSoundToClient(zm_client,SOUND_FREEZE2);
-                    default: EmitSoundToClient(zm_client,SOUND_FREEZE3);
-                }
-            }
-            else
-            {
-                StopSoundAllChans(zm_client,SOUND_FREEZE1);
-                StopSoundAllChans(zm_client,SOUND_FREEZE2);
-                StopSoundAllChans(zm_client,SOUND_FREEZE3);
-            }
+            FreezeSound(zm_client,specials_frozen && zm_stage==ZM_STARTED);
         }
+        update_tank_music();
+    }
+}
+
+// Apply on client. If freeze, play looping buildup music. If not freeze, mute all buildup music.
+stock void FreezeSound(int client,bool freeze = true)
+{
+    if (!IsValidClient(client)) return;
+    if (freeze)
+    {
+        switch(GetRandomInt(1,3))
+        {
+            case 1: EmitSoundToClient(client,SOUND_FREEZE1);
+            case 2: EmitSoundToClient(client,SOUND_FREEZE2);
+            default: EmitSoundToClient(client,SOUND_FREEZE3);
+        }
+    }
+    else
+    {
+        StopSoundAllChans(client,SOUND_FREEZE1);
+        StopSoundAllChans(client,SOUND_FREEZE2);
+        StopSoundAllChans(client,SOUND_FREEZE3);
     }
 }
 
@@ -2999,7 +3014,8 @@ void QuitZM(int client, bool print = true)
 	{
 	   if (IsValidClientZM())
 	   {
-	       FindConVar("mp_gamemode").ReplicateToClient(zm_client,g_sCvarMPGameMode);
+	       FreezeSound(zm_client,false);
+           FindConVar("mp_gamemode").ReplicateToClient(zm_client,g_sCvarMPGameMode);
            if (print)
            {
                char name[MAX_NAME_LENGTH]; 

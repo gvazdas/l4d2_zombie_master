@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.35a 2026-07-20"
+#define PLUGIN_VERSION 			"0.9.36 2026-07-22"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -42,6 +42,7 @@ bool DEBUG = false;
 #include <l4d2_zombie_master/infected>
 #include <l4d2_grid_lib>
 #include <l4d2_zombie_master/sdk>
+#include <l4d2_zombie_master/music>
 #include <l4d2_zombie_master/glow>
 #include <l4d2_zombie_master/l4d2_pvs_force>
 #include <l4d2_zombie_master/grid/l4d2_grid_renderer>
@@ -92,11 +93,13 @@ public Plugin myinfo =
 // 8. Fixed extra survivor bot appearing after round end. Thanks to deathcycle for reporting.
 // 9. "Give Up" and round end will try to assign the ZM player back to their original survivor. Thanks to deathcycle for the idea.
 // 10. zm_traps values: 0 1 2. 1 for finished traps, 2 for experimental traps
-// 11. Draw previews of units.
+// 11. Draw previews of units. new cvar zm_preview
 // 12. More audio cues for ZM.
 // 13. Three-layer ZM looktarget.
 // 14. Finale: prints finale stages instead of PANIC
 // 15. Hardcoded 5 minute timer for finale stage change if ZM has not used enough bank.
+// 16. Tank music is muted when specials are frozen, unless ZM takes control of a Tank.
+// 17. New cvar: zm_enable_control. Thanks carex53 for the idea.
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
@@ -277,6 +280,9 @@ public void OnPluginStart()
 
     g_hTraps = CreateConVar("zm_traps", "1", "Enable traps. 1: balanced traps. 2: balanced and experimental traps.", FCVAR_PROTECTED, true, 0.0, true, 2.0);
     g_hTraps.AddChangeHook(ConVarChanged_Cvars_ZMenu);
+
+    g_hPreview = CreateConVar("zm_preview", "1", "Enable previews of units.", FCVAR_PROTECTED, true, 0.0, true, 1.0);
+    g_hPreview.AddChangeHook(ConVarChanged_Cvars_ZMenu);
 
     g_hCostExplosion = CreateConVar("zm_cost_explosion", "50", "Explosion trap cost. -1 to disable.", FCVAR_PROTECTED, true, -1.0, true, 1000.0);
     g_hCostExplosion.AddChangeHook(ConVarChanged_Cvars_ZMenu);
@@ -684,6 +690,8 @@ void IsAllowed()
     	
     	HookUserMessage(GetUserMessageId("PZDmgMsg"), OnPZDmgMsg, true);
     	HookUserMessage(GetUserMessageId("Damage"), OnPZDmgMsg, true);
+
+        Music_Monitor_Enable();
 		
 	}
     
@@ -1349,6 +1357,8 @@ Action CountClients(Handle timer = null)
         ignore_threat_pending = false;
     	if (first_tank_stage==FIRST_TANK_SPAWNED) first_tank_stage = FIRST_TANK_DEAD;
 	}
+
+    update_tank_music();
 	
 	if (temp_SI==1 && IsValidEntity(last_valid_target)) update_entref_control(EntIndexToEntRef(last_valid_target),false);
 	
@@ -1401,6 +1411,7 @@ public Action L4D_OnGetScriptValueInt(const char[] key, int &retVal)
         	//}
       		if (strcmp(key, "SpecialInfectedAssault", false) == 0) // makes specials less shit except smokers and chargers
           	{
+                //retVal = specials_frozen ? 0 : 1;
                 retVal = 1;
                 return Plugin_Handled;
           	}
@@ -1415,7 +1426,8 @@ public Action L4D_OnGetScriptValueInt(const char[] key, int &retVal)
         	
         	if (strcmp(key, "cm_AggressiveSpecials", false) == 0) // makes specials less shit except smokers and chargers
         	{
-               	retVal = 1;
+               	//retVal = specials_frozen ? 0 : 1;
+                retVal = 1;
                	return Plugin_Handled;
         	}
         	if (strcmp(key, "cm_ShouldHurry", false) == 0)
@@ -1432,14 +1444,14 @@ public Action L4D_OnGetScriptValueInt(const char[] key, int &retVal)
                  return Plugin_Handled;
           	}
     	}
-    	case 'E':
-    	{
-        	if (strcmp(key, "EnforceFinaleNavSpawnRules", false) == 0) // might not do anything
-        	{
-               retVal = 0;
-               return Plugin_Handled;
-        	}
-    	}
+    	//case 'E':
+    	//{
+        //	if (strcmp(key, "EnforceFinaleNavSpawnRules", false) == 0) // might not do anything
+        //	{
+        //       retVal = 0;
+        //       return Plugin_Handled;
+        //	}
+    	//}
     	
 	}
 	return Plugin_Continue;
@@ -1460,11 +1472,8 @@ public void OnEntityCreated(int entity, const char[] classname)
     	//{
         //	if (specials_frozen && strcmp(classname,"tank",false)==0)
         //	{
-        //	//if (specials_frozen && strcmp(classname,"tank",false)==0)
-        //	//{
-        //    	SilentTank(entity);
+        //    	SilentTank(EntIndexToEntRef(entity));
         //    	RequestFrame(SilentTank,EntIndexToEntRef(entity));
-        //	//}
         //	}
     	//}
 	}
@@ -2076,6 +2085,9 @@ public void OnMapStart()
 	}
 	
 	g_bMapStarted = true;
+    musicStringTank = "";
+
+    Reset_infected_Models();
 	
 }
 
@@ -2106,6 +2118,9 @@ public void OnMapEnd()
     g_bMapStarted = false;
     first_active = false;
     reset_time_of_day();
+    Music_Monitor_Cleanup();
+    musicStringTank = "";
+    Reset_infected_Models();
 }
 
 // this runs very frequently, find a better way.
@@ -2387,6 +2402,10 @@ public void OnPluginEnd()
     reset_time_of_day();
     unmute_zm();
     set_force_start(false);
+    Music_Monitor_Disable();
+    Music_Monitor_Cleanup();
+    Music_TankDetour_Disable();
+    Reset_infected_Models();
 }
 
 void Event_TriggeredCarAlarm(Event event, const char[] name, bool dontBroadcast)

@@ -5,6 +5,92 @@
 
 // infected entity logistics
 
+bool g_bSkipModelPrecache = false; // set to true to disable modelprecache scan. if server is crashing.
+
+// Load all common infected models from modelprecache string table.
+bool g_bModelsLoaded;
+ArrayList g_infectedModels; // all infected models
+float t_last_infected_model;
+stock void Load_infected_Models()
+{
+	if (g_bModelsLoaded || g_bSkipModelPrecache) return;
+    int table = FindStringTable("modelprecache");
+	int total = GetStringTableNumStrings(table);
+	static char sTemp[PLATFORM_MAX_PATH];
+	delete g_infectedModels;
+	g_infectedModels = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
+	for( int i = 0; i < total; i++ )
+	{
+		ReadStringTable(table, i, sTemp, sizeof(sTemp)); // _w_ models appear to be gib related, i dont think they have this lag issue.
+		if( strncmp(sTemp,"models/infected/common",22)==0 && StrContains(sTemp,"_w_",false)<0 )
+		{
+        	g_infectedModels.PushString(sTemp);
+        }
+	}
+	if (DEBUG) LogMessage("modelprecache: %d models", g_infectedModels.Length);
+    g_bModelsLoaded = true;
+}
+
+// Clear all models and client cached states
+stock void Reset_infected_Models()
+{
+    delete g_infectedModels;
+    g_bModelsLoaded = false;
+}
+
+// Get a random infected model based on zm menu state and game rules.
+stock void GetRandomInfectedModel(char[] model, int size = PLATFORM_MAX_PATH)
+{
+    static int gender;
+    if (valid_uncommon(g_sForceCommon))
+    {
+        gender = label_to_gender(g_sForceCommon);
+        if (calculate_infected_cost(gender)>=0)
+        {
+            infected_gender_to_model(gender,model);
+            if (model[0]!=0) return;
+        }
+    }
+    if (zm_menu_state == ZM_MENU_UNCOMMON || g_iCostCommon<0)
+    {
+        gender = label_to_gender("random");
+        if (calculate_infected_cost(gender)>=0)
+        {
+            infected_gender_to_model(gender,model);
+            if (model[0]!=0) return;
+        }
+    }
+    if (zm_menu_state == ZM_MENU_BOSS)
+    {
+        switch(GetRandomInt(0,1))
+        {
+            case 0: infected_gender_to_model(TYPE_JIMMY_GIBBS,model);
+            default: infected_gender_to_model(TYPE_FALLEN,model);
+        }
+        if (model[0]!=0) return;
+    }
+    if (GetRandomFloat()>0.5)
+    {
+        strcopy(model,size,MODEL_COMMON);
+        if (model[0]!=0) return;
+    }
+    Load_infected_Models();
+    if (g_infectedModels == null || g_infectedModels.Length<=0)
+    {
+        strcopy(model,size,MODEL_COMMON);
+        return;
+    }
+    if (g_infectedModels.Length==1)
+    {
+        g_infectedModels.GetString(0,model,size);
+        if (model[0]!=0) return;
+    }
+    int i = GetRandomInt(0,g_infectedModels.Length-1);
+    g_infectedModels.GetString(i,model,size);
+    if (model[0]!=0) return;
+    strcopy(model,size,MODEL_COMMON);
+}
+
 #define MODEL_RIOT "models/infected/common_male_riot.mdl"
 #define MODEL_RIOT2 "models/infected/common_male_riot_l4d1.mdl"
 

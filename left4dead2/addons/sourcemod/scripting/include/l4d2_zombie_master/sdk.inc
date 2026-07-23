@@ -82,13 +82,18 @@ void PrepSDKCall()
 	//PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, "Infected::AttackSurvivorTeam");
 	//hInfectedAttackSurvivorTeam = EndPrepSDKCall();
 
-	//StartPrepSDKCall(SDKCall_Entity);
-	//PrepSDKCall_SetFromConf(hGameData_l4dhooks, SDKConf_Signature, "Tank::EnterStasis");
-	//hTankEnterStasis = EndPrepSDKCall();
+	//Handle gdd_l4dd = LoadGameConfigFile("left4dhooks.l4d2");
+    //if (gdd_l4dd != null)
+    //{
+        //StartPrepSDKCall(SDKCall_Entity);
+		//PrepSDKCall_SetFromConf(gdd_l4dd, SDKConf_Signature, "Tank::EnterStasis");
+		//hTankEnterStasis = EndPrepSDKCall();
 
-	//StartPrepSDKCall(SDKCall_Entity);
-	//PrepSDKCall_SetFromConf(hGameData_l4dhooks, SDKConf_Signature, "Tank::LeaveStasis");
-	//hTankLeaveStasis = EndPrepSDKCall();
+		//StartPrepSDKCall(SDKCall_Entity);
+		//PrepSDKCall_SetFromConf(gdd_l4dd, SDKConf_Signature, "Tank::LeaveStasis");
+		//hTankLeaveStasis = EndPrepSDKCall();
+    //}
+	//delete gdd_l4dd;
 
 	int acceptInputOffset = GameConfGetOffset(hGameData, "CBaseEntity::AcceptInput");
 	if (acceptInputOffset == -1)
@@ -222,6 +227,39 @@ void PrepSDKCall()
 	//	LogMessage("[zm] INFO: TerrorNavArea::IsPotentiallyVisible SDKCall ready");
 
 	delete hGameData;
+
+	Load_PlayMusic_Detour();
+
+}
+
+// Setup Music::Play
+stock void Load_PlayMusic_Detour()
+{
+	Handle gdd_l4dd = LoadGameConfigFile("left4dhooks.l4d2");
+    if (gdd_l4dd == null)
+    {
+        LogMessage("WARNING: failed to load gamedata/left4dhooks.l4d2.txt");
+		delete gdd_l4dd;
+		return;
+    }
+	hPlayMusic = new DynamicDetour(Address_Null, CallConv_THISCALL, ReturnType_Void, ThisPointer_Ignore);
+	if (hPlayMusic==null)
+	{
+		LogMessage("WARNING: failed to load Music::Play from gamedata");
+		delete gdd_l4dd;
+		return;
+	}
+	DHookSetFromConf(hPlayMusic, gdd_l4dd, SDKConf_Signature, "Music::Play");
+    hPlayMusic.AddParam(HookParamType_CharPtr);      // 1: Track string path
+    hPlayMusic.AddParam(HookParamType_Int);          // 2: Source index / Profile flag
+    hPlayMusic.AddParam(HookParamType_Float);        // 3: Track delay 
+    hPlayMusic.AddParam(HookParamType_Int);          // 4: Boolean #1
+    hPlayMusic.AddParam(HookParamType_Int);          // 5: Boolean #2
+	if (hPlayMusic==null)
+	{
+		LogMessage("WARNING: failed to load Music::Play");
+	}
+	delete gdd_l4dd;
 }
 
 stock bool NavArea_IsPotentiallyVisibleToTeam(Address navArea, int team)

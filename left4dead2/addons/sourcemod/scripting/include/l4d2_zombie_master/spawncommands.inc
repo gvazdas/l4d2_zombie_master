@@ -124,7 +124,7 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 	if (!(client==zm_client || client==0)) return;
 	if (DEBUG) LogMessage("[zm] ZM_Horde");
 	
-	if (client == zm_client) update_spawner_zombieclass(ZOMBIECLASS_COMMON);
+	if (client == zm_client && gamerules_allow_zClass(ZOMBIECLASS_COMMON)) update_spawner_zombieclass(ZOMBIECLASS_COMMON);
 	float t_start = GetEngineTime(); // for profiling
 	
 	if (hint && is_zm_spamming())
@@ -410,7 +410,7 @@ void ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
 	if (!(client==zm_client || client==0)) return;
 	if (client == zm_client)
 	{
-		update_spawner_zombieclass(ZOMBIECLASS_WITCH);
+		if (gamerules_allow_zClass(ZOMBIECLASS_WITCH)) update_spawner_zombieclass(ZOMBIECLASS_WITCH);
 		g_bLastWitchMoving = witch_type==WITCH_MOVING;
 	}
 
@@ -889,7 +889,7 @@ int ZM_Spawn_SI(int client, int ZOMBIECLASS, bool free = false, bool setpos=fals
     }
 
 	//LogMessage("[zm] ZM_Spawn_SI %d %d", ZOMBIECLASS, flow);
-    if (client == zm_client) update_spawner_zombieclass(ZOMBIECLASS);
+	if (gamerules_allow_zClass(ZOMBIECLASS)) update_spawner_zombieclass(ZOMBIECLASS);
     
 	if (!setpos && is_zm_spamming())
 	{
