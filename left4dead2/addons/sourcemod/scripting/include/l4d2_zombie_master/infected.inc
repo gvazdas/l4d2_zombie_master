@@ -69,11 +69,11 @@ stock void GetRandomInfectedModel(char[] model, int size = PLATFORM_MAX_PATH)
         }
         if (model[0]!=0) return;
     }
-    if (GetRandomFloat()>0.5)
-    {
-        strcopy(model,size,MODEL_COMMON);
-        if (model[0]!=0) return;
-    }
+    //if (GetRandomFloat()>0.5)
+    //{
+    //    strcopy(model,size,MODEL_COMMON);
+    //    if (model[0]!=0) return;
+    //}
     Load_infected_Models();
     if (g_infectedModels == null || g_infectedModels.Length<=0)
     {

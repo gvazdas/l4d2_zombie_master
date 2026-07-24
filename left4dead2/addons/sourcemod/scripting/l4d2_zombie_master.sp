@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.36 2026-07-22"
+#define PLUGIN_VERSION 			"0.9.36a 2026-07-23"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -284,6 +284,9 @@ public void OnPluginStart()
     g_hPreview = CreateConVar("zm_preview", "1", "Enable previews of units.", FCVAR_PROTECTED, true, 0.0, true, 1.0);
     g_hPreview.AddChangeHook(ConVarChanged_Cvars_ZMenu);
 
+    g_hCvarCommonSequence = CreateConVar("zm_common_preview_sequence", "13", "Animation sequence for common infected previews.",FCVAR_PROTECTED,true,0.0,true,1000.0);
+    g_hCvarCommonSequence.AddChangeHook(ConVarChanged_Cvars_ZMenu);
+
     g_hCostExplosion = CreateConVar("zm_cost_explosion", "50", "Explosion trap cost. -1 to disable.", FCVAR_PROTECTED, true, -1.0, true, 1000.0);
     g_hCostExplosion.AddChangeHook(ConVarChanged_Cvars_ZMenu);
 
@@ -413,6 +416,7 @@ public void OnPluginStart()
     
     g_hCostAngry = CreateConVar("zm_cost_angry", "25", "Additive cost to make common infected chase survivors. -1 to disable.",FCVAR_PROTECTED, true, -1.0, true, 10000.0);
     g_hCostAngry.AddChangeHook(ConVarChanged_Cvars_ZMenu);
+
 
     // r_screenoverlay is cheat-flagged by default; strip the flag so the gnome
     // effect can push a per-client overlay without sv_cheats.
@@ -2086,8 +2090,9 @@ public void OnMapStart()
 	
 	g_bMapStarted = true;
     musicStringTank = "";
-
     Reset_infected_Models();
+    g_hIgnoreTankTimer = null;
+    g_bIgnoreTankMusic = false;
 	
 }
 

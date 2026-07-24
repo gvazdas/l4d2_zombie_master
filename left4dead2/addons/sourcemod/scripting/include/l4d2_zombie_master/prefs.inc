@@ -56,7 +56,7 @@ stock void ZMPrefs_Apply(int client)
     autocommon_uncommons = ReadCookieInt(client, g_cAutoCommonUncommon,0) == 1;
 
     // AutoCommon: Mode - OFF PANIC ALWAYS
-    autocommon_setting = ReadCookieInt(client, g_cAutoCommonMode,AUTOCOMMON_OFF);
+    autocommon_setting = ReadCookieInt(client, g_cAutoCommonMode,AUTOCOMMON_ALWAYS);
     if (autocommon_setting<0) autocommon_setting = 0;
     else if (autocommon_setting>AUTOCOMMON_ALWAYS) autocommon_setting = AUTOCOMMON_ALWAYS;
 

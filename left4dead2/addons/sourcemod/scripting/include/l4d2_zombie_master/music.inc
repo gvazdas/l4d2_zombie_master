@@ -8,6 +8,19 @@
 bool g_bDisableTankDetour = false; // if this broke, set to true to completely avoid messing with tank music
 bool g_bIgnoreTankMusic = false; // ignore incoming Tank music soundstring
 
+Handle g_hIgnoreTankTimer; // timer for g_bIgnoreTankMusic
+
+Action Timer_IgnoreTankMusic(Handle timer = null, bool state = true)
+{
+    if (g_hIgnoreTankTimer!=null && timer!=g_hIgnoreTankTimer)
+    {
+        return Plugin_Stop;
+    }
+    g_hIgnoreTankTimer = null;
+    g_bIgnoreTankMusic = state;
+    return Plugin_Stop;
+}
+
 // Mute/unmute tank music depending on game state
 stock void update_tank_music()
 {
@@ -127,7 +140,11 @@ public MRESReturn Detour_MusicPlayPre(DHookParam hParams)
     if (StrContains(musicString,"tank",false) != -1)
     {
         //LogMessage("Detour_MusicPlayPre blocked %s", musicString);
-        if (!g_bIgnoreTankMusic) musicStringTank = musicString;
+        if (!g_bIgnoreTankMusic)
+        {
+            musicStringTank = musicString;
+            //LogMessage("musicStringTank -> %s", musicStringTank);
+        }
         return MRES_Supercede; 
     }
     return MRES_Ignored;
@@ -140,14 +157,15 @@ stock void play_tank_music_alive(bool force = false)
     static char musicString[PLATFORM_MAX_PATH];
     if (musicStringTank[0]==0) musicString = "Event.Tank";
     else musicString = musicStringTank;
-    //LogMessage("play_tank_music_alive %s", musicString);
+    LogMessage("play_tank_music_alive %s", musicString);
     g_bIgnoreTankMusic = true;
     for (int i = 1; i <= MaxClients; i++)
     {
         if (!IsValidClient(i) || !IsPlayerAlive(i)) continue;
         L4D_PlayMusic(i,musicString,0,0.0,true,true);
     }
-    g_bIgnoreTankMusic = false;
+    g_hIgnoreTankTimer = CreateTimer(0.1,Timer_IgnoreTankMusic,false,TIMER_FLAG_NO_MAPCHANGE);
+    //g_bIgnoreTankMusic = false;
 }
 
 // Stop Tank music for all players
@@ -174,6 +192,14 @@ public MRESReturn Detour_MusicPlayPost(DHookParam hParams)
     {
         int flagVal = hParams.Get(2);
         LogMessage("PlayMusic %s %d", musicString, flagVal);
+    }
+    if (!g_bIgnoreTankMusic && strcmp(musicString,musicStringTank)!=0)
+    {
+        if (StrContains(musicString,"tank",false) != -1)
+        {
+            musicStringTank = musicString;
+            //LogMessage("musicStringTank -> %s", musicStringTank);
+        }
     }
     if (CharToLower(musicString[0])=='e')
     {

@@ -126,7 +126,7 @@ void draw_preview_zombie(const float pos[3], const int state = SPAWNER_OK, const
         {
             static char common_model[PLATFORM_MAX_PATH];
             float t_now = GetGameTime();
-            if (FloatAbs(t_last_infected_model-t_now)>=1.0)
+            if (FloatAbs(t_last_infected_model-t_now)>=2.0)
             {
                 t_last_infected_model = t_now;
                 GetRandomInfectedModel(common_model);
@@ -145,7 +145,7 @@ void draw_preview_zombie(const float pos[3], const int state = SPAWNER_OK, const
     int sequence;
     switch (zClass)
     {
-        case ZOMBIECLASS_COMMON: sequence = 16;
+        case ZOMBIECLASS_COMMON: sequence = g_hCvarCommonSequence.IntValue;
         case ZOMBIECLASS_WITCH: sequence = g_bLastWitchMoving ? 10 : 4;
         default: sequence = 2;
     }
