@@ -588,7 +588,8 @@ void create_boss_menu()
     AddMenuItem(menu_boss, "item_4", buffer);
     
     if (valid_uncommon(g_sForceCommon) && strcmp(g_sForceCommon,"fallen")!=0) buffer = "-";
-    else if (fallen_spawned || g_iLiveFallen>=g_hMaxFallen.IntValue || g_iCostUncommon<0 || max_zombie_arr[ZOMBIECLASS_COMMON]<=0) buffer = "-";
+    //else if (fallen_spawned || g_iLiveFallen>=g_hMaxFallen.IntValue || g_iCostUncommon<0 || max_zombie_arr[ZOMBIECLASS_COMMON]<=0) buffer = "-";
+    else if (g_iLiveFallen>=g_hMaxFallen.IntValue || g_iCostUncommon<0 || max_zombie_arr[ZOMBIECLASS_COMMON]<=0) buffer = "-";
     else Format(buffer, sizeof(buffer), "%T %d", "Fallen Survivor", zm_language,g_iCostUncommon);
     buffer_add_rawline(buffer);
     AddMenuItem(menu_boss, "item_5", buffer);

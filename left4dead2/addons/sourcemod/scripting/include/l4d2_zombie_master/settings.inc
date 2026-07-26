@@ -368,6 +368,9 @@ void ResetCvars()
 	
 	ResetConVar(FindConVar("z_large_volume_mob_too_far_xy"), true,true);
 	ResetConVar(FindConVar("z_large_volume_mob_too_far_z"), true,true);
+
+    ResetConVar(FindConVar("z_fallen_kill_suppress_time"), true,true);
+    ResetConVar(FindConVar("z_fallen_max_count"), true,true);
 	
 	// ask all plugins we are communicating with to reload their default values
 	if (shoot_alert_enable && GetConVarInt(shoot_alert_enable)<=0) ServerCommand("sm plugins reload l4d2_shoot_alert_common");

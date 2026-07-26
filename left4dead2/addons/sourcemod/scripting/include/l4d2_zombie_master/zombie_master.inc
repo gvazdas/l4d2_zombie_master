@@ -310,7 +310,7 @@ Handle ems_hud_timer;
 bool recordpos = true; // for ZM_ClientCleanup
 bool zm_just_joined = false; // for printing hints, playing intro sound
 int g_iLiveFallen;
-bool fallen_spawned;
+//bool fallen_spawned;
 char zm_survivor_model[PLATFORM_MAX_PATH]; // keep zombie master survivor model in memory
 bool zm_draw_path;
 int entref_preview = INVALID_ENT_REFERENCE; // preview prop_dynamic zombie entity for spawner
@@ -826,16 +826,16 @@ Action ZM_MOTD(int client, int args)
     PrintToConsole(client, "Zombies can be spawned with the sourcemod menu, or with chat/console commands (Section 3).");
     PrintToConsole(client, "A spawner (3 circles) shows where you are pointing (or the nearest valid location). This is where zombies will spawn.");
     PrintToConsole(client, "The spawner can be in 1 of 4 states:");
-    PrintToConsole(client, "1. GREEN -> Zombies can be spawned NOW!");
-    PrintToConsole(client, "2. BLUE -> Zombies can be spawned, but not now. Usually because survivors are too close or they can see.");
+    PrintToConsole(client, "1. GREEN -> Zombies can be spawned NOW! A zombie preview will also be displayed.");
+    PrintToConsole(client, "2. BLUE -> Zombies can be spawned, but not now, usually because survivors are too close or they can see.");
     PrintToConsole(client, "3. RED -> Zombies can NEVER be spawned here.");
-    PrintToConsole(client, "4. FLOW (long vertical blue stripe) -> Zombie locations were picked automatically.");
-    PrintToConsole(client, "To activate FLOW: look at a survivor OR the ground next to them OR spectate that survivor; then, spawn zombies.");
+    PrintToConsole(client, "4. FLOW (blue survivor glow) -> Zombie locations will be picked automatically.");
+    PrintToConsole(client, "To activate FLOW: look at a survivor OR the ground next to them OR spectate that survivor. Then, spawn zombies.");
     
     PrintToConsole(client, "");
     PrintToConsole(client, "=== 2. Keyboard Shortcuts ===");
     PrintToConsole(client, "USE (default E) -> Control/Release Special Infected.");
-    PrintToConsole(client, "FLASHLIGHT (default F) -> Flashlight.");
+    PrintToConsole(client, "FLASHLIGHT (default F) -> Flashlight. Can be very laggy on some maps.");
     PrintToConsole(client, "RELOAD (default R) -> once to open main menu; twice to close menu and hide spawner.");
     
     PrintToConsole(client, "");
@@ -880,14 +880,15 @@ Action ZM_MOTD(int client, int args)
     PrintToConsole(client, "");
     PrintToConsole(client, "=== 4. Gameplay Tips ===");
     PrintToConsole(client, "1. Go to Common -> AutoCommon. Set mode to ALWAYS, and max to 30. This will spawn common zombies ahead of the Survivors automatically.");
-    PrintToConsole(client, "2. Use Freeze SI/Unfreeze SI to set up ambushes. All Specials unfreeze automatically when one notices a Survivor. Press the USE key to fine-tune placement and view angle.");
+    PrintToConsole(client, "2. Use Freeze/Unfreeze to set up ambushes. All Specials unfreeze automatically when they sense a threat. Press the USE key to fine-tune zombie positioning.");
     PrintToConsole(client, "3. In coop, you get %d seconds of prep time. Specials will be frozen. To end prep, type /zm_start or go to Other -> Start Round.", RoundFloat(g_fPrepTimeZM));
-    PrintToConsole(client, "4. PANIC will make common and uncommon infected chase survivors, reducing your bank rate by 4x. Finales, survival, and scripted panic events give free PANIC.");
+    PrintToConsole(client, "4. PANIC will make common and uncommon infected chase survivors, reducing your bank rate by 2x. Finales, survival, and scripted panic events give free PANIC.");
     PrintToConsole(client, "5. When a Boomer vomits on a survivor, %d free zombies will be spawned. Use this to your advantage!", g_iVomitCommons);
     PrintToConsole(client, "6. Car alarms give free PANIC, free common zombies, and free bank. Trick the survivors into starting them!");
     PrintToConsole(client, "7. During Survival and Finales, bank is added in stages: in Survival when Tanks die, in Finales when you run out of bank.");
     PrintToConsole(client, "7. In coop, when Tanks are not banned, the first Tank gets progressively cheaper: up to 50% off when Survivors progress 2/3 of the map.");
-    PrintToConsole(client, "8. Units with full HP can be deleted to get a refund. You cannot refund: spotted witches, Specials that used their ability.");
+    PrintToConsole(client, "8. Units with full HP can be deleted to get a refund. You cannot refund spotted witches and Specials that used their ability.");
+    PrintToConsole(client, "9. Finale stages are displayed on your HUD. PANIC stages will hold until you used up enough bank or 5 minutes have passed.");
     
     if (CheckCommandAccess(client,"is_a_sm_admin",ADMFLAG_GENERIC,true))
     {

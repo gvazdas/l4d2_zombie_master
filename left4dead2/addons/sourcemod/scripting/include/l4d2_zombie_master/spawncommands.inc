@@ -208,7 +208,8 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 	else if (temp_gender==TYPE_FALLEN)
    	{
 		int max = g_hMaxFallen.IntValue - g_iLiveFallen;
-		if (max<=0 || fallen_spawned)
+		//if (max<=0 || fallen_spawned)
+		if (max<=0)
 		{
 			if (hint)
 			{
@@ -380,7 +381,7 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
     	    else if (strcmp(type,"fallen")==0)
     	    {
         	    g_iLiveFallen += spawned;
-				fallen_spawned = true;
+				//fallen_spawned = true;
         	    create_boss_menu();
     	    }
 	    }

@@ -36,7 +36,7 @@ void TrapExplosion_BeginArm()
         case 2: sound_explosion = EXPLOSION2;
         case 3: sound_explosion = EXPLOSION3;
     }
-    EmitSoundToAll(sound_explosion,_,_,SNDLEVEL_GUNFIRE,_,SNDVOL_NORMAL,_,_,vPos);
+    EmitSoundToAll(sound_explosion,_,_,SNDLEVEL_GUNFIRE,_,0.5,_,_,vPos);
     Trap_ConfirmArm();
     Trap_Cleanup(slot);
 }

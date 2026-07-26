@@ -14,50 +14,26 @@
 int   g_iSpawnerZombieClass;
 bool g_bLastDoorValid = false;
 bool g_bSpawnerFilterZM = false; // mark cells invisible to ZM as invalid?
+bool g_bPreviewHidden;
+int g_iPreviewZombieClass;
+
+#define PREVIEW_GLOW_INTENSITY 50
 
 // Draw transparent zombie preview at pos
-void draw_preview_zombie(const float pos[3], const int state = SPAWNER_OK, const int alpha = 150)
+void draw_preview_zombie(const float pos[3], const int state = SPAWNER_OK, const int alpha = 195)
 {
     if (!g_hPreview.BoolValue)
     {
         delete_preview_zombie();
         return;
     }
-    if (!IsValidEntRef(entref_preview))
+    if (state!=SPAWNER_OK || zm_menu_state<ZM_MENU_COMMON || zm_menu_state>ZM_MENU_BOSS)
     {
-        int prop = CreateEntityByName("prop_dynamic");
-        if (IsEntitySafe(prop))
-        {
-            SDKHook(prop, SDKHook_SetTransmit, OnTransmitPreview);
-            DispatchKeyValue(prop,"model",MODEL_COMMON);
-            DispatchSpawn(prop);
-            TeleportEntity(prop, pos, NULL_VECTOR, NULL_VECTOR);
-            SetEntProp(prop, Prop_Data, "m_nSolidType", 0);
-            SetEntityRenderMode(prop, view_as<RenderMode>(RENDER_NONE));
-            SetEntityRenderColor(prop, 255, 255, 255, 0);
-            SetEntityMoveType(prop, MOVETYPE_NONE);
-            int effects = GetEntProp(prop, Prop_Send, "m_fEffects");
-	        SetEntProp(prop, Prop_Send, "m_fEffects", effects|16|8); // no shadow, no interp
-            entref_preview = EntIndexToEntRef(prop);
-            draw_preview_zombie(pos,state,alpha);
-        }
-        else entref_preview = INVALID_ENT_REFERENCE;
-        return;
-    }
-    
-    bool show = zm_menu_state>=ZM_MENU_COMMON && zm_menu_state<=ZM_MENU_BOSS;
-
-    if (state!=SPAWNER_OK || !show)
-    {
-        delete_preview_zombie();
+        hide_preview_zombie();
         return;
     }
     
     int zClass = get_spawner_zombieclass();
-
-    // ZM_MENU_COMMON or ZM_MENU_UNCOMMON -> only ZOMBIECLASS_COMMON
-    // ZM_MENU_BOSS -> ZOMBIECLASS_WITCH, ZOMBIECLASS_TANK or ZOMBIECLASS_COMMON
-    // ZM_MENU_SPECIAL -> ZOMBIECLASS_SMOKER thru ZOMBIECLASS_CHARGER
 
     if (zm_menu_state==ZM_MENU_COMMON || zm_menu_state==ZM_MENU_UNCOMMON)
     {
@@ -83,7 +59,8 @@ void draw_preview_zombie(const float pos[3], const int state = SPAWNER_OK, const
     
     if (!gamerules_allow_zClass(zClass))
     {
-        // Select viable class for spawning
+        zClass = -1;
+        // Find viable class for spawning
         ArrayList classes = new ArrayList();
         for (int i = ZOMBIECLASS_COMMON; i <= ZOMBIECLASS_TANK; i++)
         {
@@ -102,74 +79,137 @@ void draw_preview_zombie(const float pos[3], const int state = SPAWNER_OK, const
             else zClass = classes.Get(GetRandomInt(0,classes.Length-1));
         }
         delete classes;
-    }
 
-    if (!gamerules_allow_zClass(zClass))
-    {
-        delete_preview_zombie();
-        return;
+        if (!gamerules_allow_zClass(zClass))
+        {
+            hide_preview_zombie();
+            return;
+        }
     }
 
     if (g_iLastZombieClass!=zClass) update_spawner_zombieclass(zClass,true);
 
+    static char model[PLATFORM_MAX_PATH];
     switch (zClass)
     {
-        case ZOMBIECLASS_BOOMER: DispatchKeyValue(entref_preview,"model",MODEL_BOOMER);
-        case ZOMBIECLASS_CHARGER: DispatchKeyValue(entref_preview,"model",MODEL_CHARGER);
-        case ZOMBIECLASS_HUNTER: DispatchKeyValue(entref_preview,"model",MODEL_HUNTER);
-        case ZOMBIECLASS_JOCKEY: DispatchKeyValue(entref_preview,"model",MODEL_JOCKEY);
-        case ZOMBIECLASS_SMOKER: DispatchKeyValue(entref_preview,"model",MODEL_SMOKER);
-        case ZOMBIECLASS_SPITTER: DispatchKeyValue(entref_preview,"model",MODEL_SPITTER);
-        case ZOMBIECLASS_TANK: DispatchKeyValue(entref_preview,"model",MODEL_TANK);
-        case ZOMBIECLASS_WITCH: DispatchKeyValue(entref_preview,"model",MODEL_WITCH);
+        case ZOMBIECLASS_BOOMER: model=MODEL_BOOMER;
+        case ZOMBIECLASS_CHARGER: model=MODEL_CHARGER;
+        case ZOMBIECLASS_HUNTER: model=MODEL_HUNTER;
+        case ZOMBIECLASS_JOCKEY: model=MODEL_JOCKEY;
+        case ZOMBIECLASS_SMOKER: model=MODEL_SMOKER;
+        case ZOMBIECLASS_SPITTER: model=MODEL_SPITTER;
+        case ZOMBIECLASS_TANK: model=MODEL_TANK;
+        case ZOMBIECLASS_WITCH: model=MODEL_WITCH;
         default:
         {
-            static char common_model[PLATFORM_MAX_PATH];
-            float t_now = GetGameTime();
-            if (FloatAbs(t_last_infected_model-t_now)>=2.0)
+            if (g_iPreviewZombieClass!=ZOMBIECLASS_COMMON)
             {
-                t_last_infected_model = t_now;
-                GetRandomInfectedModel(common_model);
+                GetRandomInfectedModel(model);
+                t_last_infected_model = GetGameTime();
             }
-            if (common_model[0]==0) common_model = MODEL_COMMON;
-            DispatchKeyValue(entref_preview,"model",common_model);
+            else
+            {
+                float t_now = GetGameTime();
+                if (FloatAbs(t_last_infected_model-t_now)>=1.5)
+                {
+                    t_last_infected_model = t_now;
+                    GetRandomInfectedModel(model);
+                }
+            }
+            if (model[0]==0) model = MODEL_COMMON;
         }
     }
-    DispatchSpawn(entref_preview);
-    TeleportEntity(entref_preview, pos, NULL_VECTOR, NULL_VECTOR);
-    SetEntityRenderMode(entref_preview, view_as<RenderMode>(RENDER_TRANSCOLOR));
-    //SetEntityRenderFx(entref_preview,view_as<RenderFx>(RENDERFX_PULSE_SLOW));
 
+    if (g_iPreviewZombieClass!=zClass && g_iPreviewZombieClass==ZOMBIECLASS_WITCH)
+    {
+        delete_preview_zombie(); // prevent glowing eyes from transfering
+    }
+
+    if (!IsValidEntRef(entref_preview))
+    {
+        int prop = CreateEntityByName("prop_dynamic");
+        if (IsEntitySafe(prop))
+        {
+            SDKHook(prop, SDKHook_SetTransmit, OnTransmitPreview);
+            DispatchKeyValue(prop,"model",model);
+            DispatchSpawn(prop);
+            TeleportEntity(prop, pos, NULL_VECTOR, NULL_VECTOR);
+            SetEntProp(prop, Prop_Data, "m_nSolidType", 0);
+            SetEntityRenderMode(prop, view_as<RenderMode>(RENDER_NONE));
+            SetEntityMoveType(prop, MOVETYPE_NONE);
+            int effects = GetEntProp(prop, Prop_Send, "m_fEffects");
+	        SetEntProp(prop, Prop_Send, "m_fEffects", effects|8|16|64); // NOINTERP NOSHADOW NORECEIVESHADOW
+            entref_preview = EntIndexToEntRef(prop);
+            g_bPreviewHidden = false;
+            //LogMessage("draw_preview_zombie prop_dynamic %d %d", prop, entref_preview);
+        }
+        else
+        {
+            entref_preview = INVALID_ENT_REFERENCE;
+            return;
+        }
+    }
+    else
+    {
+        DispatchKeyValue(entref_preview,"model",model);
+        DispatchSpawn(entref_preview);
+        TeleportEntity(entref_preview, pos, NULL_VECTOR, NULL_VECTOR);
+    }
+
+    SetEntityRenderMode(entref_preview, view_as<RenderMode>(RENDER_TRANSCOLOR));
+    SetEntityRenderFx(entref_preview,view_as<RenderFx>(RENDERFX_PULSE_SLOW));
     SetEntityRenderColor(entref_preview,255,255,255,alpha);
+
+    SetEntProp(entref_preview, Prop_Send, "m_iGlowType", 3);
+    SetEntProp(entref_preview, Prop_Send, "m_glowColorOverride",PREVIEW_GLOW_INTENSITY|(PREVIEW_GLOW_INTENSITY<<8)|(PREVIEW_GLOW_INTENSITY<<16));
+    SetEntProp(entref_preview, Prop_Send, "m_nGlowRangeMin", 0);
+    SetEntProp(entref_preview, Prop_Send, "m_nGlowRange", 999999);
+    AcceptEntityInput(entref_preview, "StartGlowing");
 
     int sequence;
     switch (zClass)
     {
         case ZOMBIECLASS_COMMON: sequence = g_hCvarCommonSequence.IntValue;
         case ZOMBIECLASS_WITCH: sequence = g_bLastWitchMoving ? 10 : 4;
+        case ZOMBIECLASS_SPITTER: sequence = 4;
+        case ZOMBIECLASS_HUNTER: sequence = 3;
         default: sequence = 2;
     }
-    
     SetEntProp(entref_preview,Prop_Send,"m_nSequence",sequence);
-    SetEntPropFloat(entref_preview, Prop_Send, "m_flCycle",0.0);
-    int parity = GetEntProp(entref_preview, Prop_Send, "m_nNewSequenceParity");
-    SetEntProp(entref_preview, Prop_Send, "m_nNewSequenceParity", (parity + 1) & 7); 
-    SetEntPropFloat(entref_preview, Prop_Send, "m_flPlaybackRate", 1.0);
-    SetEntPropFloat(entref_preview, Prop_Data, "m_flAnimTime", GetGameTime());
+    SetEntPropFloat(entref_preview, Prop_Send, "m_flPlaybackRate", 0.33);
+    if (g_bPreviewHidden)
+    {
+        int effects = GetEntProp(entref_preview, Prop_Send, "m_fEffects");
+	    SetEntProp(entref_preview, Prop_Send, "m_fEffects", effects&~32); // DRAW
+    }
+    g_bPreviewHidden = false;
+    g_iPreviewZombieClass = zClass;
 }
 
 void hide_preview_zombie()
 {
+    if (g_bPreviewHidden) return;
+    g_bPreviewHidden = true;
+    if (g_iPreviewZombieClass==ZOMBIECLASS_WITCH)
+    {
+        delete_preview_zombie(); // hide glowing eyes
+        return;
+    }
     if (IsValidEntRef(entref_preview))
     {
+        int effects = GetEntProp(entref_preview, Prop_Send, "m_fEffects");
+	    SetEntProp(entref_preview, Prop_Send, "m_fEffects", effects|32); // NODRAW
         SetEntityRenderMode(entref_preview, view_as<RenderMode>(RENDER_NONE));
-        SetEntityRenderColor(entref_preview,255,255,255,0);
+        SetEntityRenderColor(entref_preview,0,0,0,0);
+        SetEntProp(entref_preview, Prop_Send, "m_iGlowType", 0);
+        AcceptEntityInput(entref_preview, "StopGlowing");
     }
 }
 
 void delete_preview_zombie()
 {
     if (IsValidEntRef(entref_preview)) RemoveEntity(entref_preview);
+    g_iPreviewZombieClass = -1;
     entref_preview = INVALID_ENT_REFERENCE;
 }
 
@@ -225,7 +265,7 @@ void update_ZM_spawner(const float target_pos[3], const float spawner_pos[3], co
         TE_SetupBeamRingPoint(draw_pos,HULL_DX-2.0,HULL_DX+2.0,g_iLaser,g_iHalo,0,0,g_fUpdateRate*2.0,1.5,0.0,color,0,0);
         TE_SendToClient(zm_client);
 
-        draw_preview_zombie(spawner_pos,state,125);
+        draw_preview_zombie(spawner_pos,state);
 
         float t_now = GetGameTime();
         

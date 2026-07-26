@@ -12,10 +12,7 @@ Handle g_hIgnoreTankTimer; // timer for g_bIgnoreTankMusic
 
 Action Timer_IgnoreTankMusic(Handle timer = null, bool state = true)
 {
-    if (g_hIgnoreTankTimer!=null && timer!=g_hIgnoreTankTimer)
-    {
-        return Plugin_Stop;
-    }
+    if (g_hIgnoreTankTimer!=null && timer!=g_hIgnoreTankTimer) return Plugin_Stop;
     g_hIgnoreTankTimer = null;
     g_bIgnoreTankMusic = state;
     return Plugin_Stop;
@@ -52,6 +49,7 @@ stock void update_tank_music()
         {
             // Tank music must play if there is at least one Threat Tank
             mute = true;
+            threat = false;
             for (int i=1;i<=MaxClients;i++)
             {
                 if (!IsValidClient(i) || !IsPlayerAlive(i) || GetClientTeam(i)!=TEAM_INFECTED) continue;
@@ -193,12 +191,13 @@ public MRESReturn Detour_MusicPlayPost(DHookParam hParams)
         int flagVal = hParams.Get(2);
         LogMessage("PlayMusic %s %d", musicString, flagVal);
     }
-    if (!g_bIgnoreTankMusic && strcmp(musicString,musicStringTank)!=0)
+    if (!g_bIgnoreTankMusic && live_zombie_arr[ZOMBIECLASS_TANK]>0)
     {
         if (StrContains(musicString,"tank",false) != -1)
         {
             musicStringTank = musicString;
             //LogMessage("musicStringTank -> %s", musicStringTank);
+            return MRES_Ignored;
         }
     }
     if (CharToLower(musicString[0])=='e')
@@ -253,6 +252,7 @@ stock void L4D_Stop_TankMusic_Client(const int client)
     L4D_StopMusic(client, "C2M5.RidinTank2");
     L4D_StopMusic(client, "C2M5.BadManTank1");
     L4D_StopMusic(client, "C2M5.BadManTank2");
+    if (musicStringTank[0]!=0) L4D_StopMusic(client, musicStringTank);
 }
 
 // Clear looping music for client. if zm_joined, clear out survivor-related sounds but not background music or etc.

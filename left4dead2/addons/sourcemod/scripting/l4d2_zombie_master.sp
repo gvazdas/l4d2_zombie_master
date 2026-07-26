@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.36a 2026-07-23"
+#define PLUGIN_VERSION 			"0.9.36d 2026-07-25"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -100,6 +100,7 @@ public Plugin myinfo =
 // 15. Hardcoded 5 minute timer for finale stage change if ZM has not used enough bank.
 // 16. Tank music is muted when specials are frozen, unless ZM takes control of a Tank.
 // 17. New cvar: zm_enable_control. Thanks carex53 for the idea.
+// 18. Infinite fallen survivors
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
@@ -110,7 +111,6 @@ public Plugin myinfo =
 // 41. Special context interact: delete, move, attack nearest
 // 51. Find out why commons get auto culled on finale start. Can avoid culling if they are attacking other infected...
 // 52. Smoker, Charger stupid behavior after ability fail.
-// 57. Frozen tanks should be in stasis to prevent music // EFL_DORMANT Entity_Flags
 // 58. Autokill obstructed stuck units
 // 60. Survivors teleport and fall to their death.
 // 62. Fun command: z_mute_infected no yelling or growling, allowing to stealth attack survivors.
@@ -449,6 +449,10 @@ public void OnPluginStart()
     g_hMaxFallen = FindConVar("z_fallen_max_count"); // how many fallen are allowed
     g_hMaxFallen.AddChangeHook(ConVarChanged_Cvars_ZMenu);
 
+    // Remove cheat flag on fallen survivor
+    gnomeOverlayFlags = GetCommandFlags("z_fallen_kill_suppress_time");
+    if (gnomeOverlayFlags != INVALID_FCVAR_FLAGS) SetCommandFlags("z_fallen_kill_suppress_time", gnomeOverlayFlags & ~FCVAR_CHEAT);
+
     // SI spawn sounds
     sounds_SI[ZOMBIECLASS_BOOMER][0] =  "music/bacteria/boomerbacteria.wav";
     sounds_SI[ZOMBIECLASS_BOOMER][1] =  "music/bacteria/boomerbacterias.wav";
@@ -696,6 +700,9 @@ void IsAllowed()
     	HookUserMessage(GetUserMessageId("Damage"), OnPZDmgMsg, true);
 
         Music_Monitor_Enable();
+
+        if (g_hMaxFallen) SetConVarInt(g_hMaxFallen,1000);
+        SetConVarInt(FindConVar("z_fallen_kill_suppress_time"),0);
 		
 	}
     
@@ -1149,6 +1156,8 @@ Action zm_new_round(Handle timer = null)
 	zm_win_announced = false;
 	
 	enable_challenge_mode();
+    if (g_hMaxFallen) SetConVarInt(g_hMaxFallen,1000);
+    SetConVarInt(FindConVar("z_fallen_kill_suppress_time"),0);
 	
 	costs_SI[ZOMBIECLASS_TANK] = g_hCostTank.IntValue;
 	first_tank_stage = 0;
@@ -1240,7 +1249,7 @@ Action zm_new_round(Handle timer = null)
    	}
 	
 	jimmy_spawned = false;
-    fallen_spawned = false;
+    //fallen_spawned = false;
 	
 	zm_menu_state = ZM_MENU_CLOSED;
 	RequestFrame(update_menus);
@@ -1277,6 +1286,7 @@ Action zm_new_round(Handle timer = null)
 	PrintToChatAll("[zm] Type /zm_help to read the Zombie Master tutorial.");
 	
 	zm_update();
+    Traps_TeardownAll();
 	
 	return Plugin_Continue;
     
@@ -1576,6 +1586,7 @@ void evtFinaleStart(Event event, const char[] name, bool dontBroadcast)
 public void L4D2_VomitJar_Detonate_Post(int entity, int client)
 {
     //if (!IsValidClient(client) || GetClientTeam(client)!=TEAM_SURVIVOR) return;
+    if (!g_bCvarAllow) return;
     g_bVomitJar = true;
     g_hVomitJarTimer = CreateTimer(VOMIT_JAR_DURATION,vomit_jar_reset,TIMER_FLAG_NO_MAPCHANGE);
 }
@@ -2411,6 +2422,7 @@ public void OnPluginEnd()
     Music_Monitor_Cleanup();
     Music_TankDetour_Disable();
     Reset_infected_Models();
+    GameRules_SetProp("m_bChallengeModeActive", false, _, _, true);
 }
 
 void Event_TriggeredCarAlarm(Event event, const char[] name, bool dontBroadcast)

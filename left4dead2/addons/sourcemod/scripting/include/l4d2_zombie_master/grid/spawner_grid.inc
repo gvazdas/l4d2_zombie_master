@@ -496,7 +496,7 @@ Action Grid_TimerUpdate(Handle timer, int userid)
             zm_spawner_pos = g_GridClosestValidPos;
             zm_spawner_state = g_GridCellContext[closestValidIdx];
             zm_spawner_navArea = closestNavArea;
-            draw_preview_zombie(zm_spawner_pos,zm_spawner_state,125);
+            draw_preview_zombie(zm_spawner_pos,zm_spawner_state);
         }
         g_GridValidCellIdx = closestValidIdx;
     }
