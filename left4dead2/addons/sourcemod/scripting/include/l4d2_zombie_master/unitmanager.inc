@@ -513,3 +513,22 @@ void update_dynamic_tank()
         create_boss_menu();
     }
 }
+
+// Calculate cost to spawn infected entity. -1 if spawning is illegal.
+stock int calculate_infected_cost(const int gender = 1, const bool angry = false)
+{
+    int cost = 0;
+    if (gender==TYPE_RIOT) cost = g_hCostRiot.IntValue;
+    else if (gender>=TYPE_CEDA) cost = g_iCostUncommon;
+    else cost = g_iCostCommon;
+
+    if (cost<0) return -1;
+
+    if (angry)
+    {
+        if (g_hCostAngry.IntValue<0) return -1;
+        cost += g_hCostAngry.IntValue;
+    }
+
+    return cost;
+}

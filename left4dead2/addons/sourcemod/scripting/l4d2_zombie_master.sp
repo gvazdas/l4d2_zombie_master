@@ -34,12 +34,12 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.36d 2026-07-25"
+#define PLUGIN_VERSION 			"0.9.36f 2026-07-26"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
 #include <l4d2_zombie_master/zombie_master>
-#include <l4d2_zombie_master/infected>
+#include <l4d2_zombie_master/models>
 #include <l4d2_grid_lib>
 #include <l4d2_zombie_master/sdk>
 #include <l4d2_zombie_master/music>
@@ -88,7 +88,7 @@ public Plugin myinfo =
 // 3. New cvar: zm_enable_control
 // 4. New cvar: zm_cost_riot 50
 // 5. New cvar: zm_cost_angry 25
-// 6. Better Fallen Survivor logic.
+// 6. Better Fallen Survivor logic. Infinite fallen survivors.
 // 7. More robust refund logic for common infected and witches.
 // 8. Fixed extra survivor bot appearing after round end. Thanks to deathcycle for reporting.
 // 9. "Give Up" and round end will try to assign the ZM player back to their original survivor. Thanks to deathcycle for the idea.
@@ -100,7 +100,7 @@ public Plugin myinfo =
 // 15. Hardcoded 5 minute timer for finale stage change if ZM has not used enough bank.
 // 16. Tank music is muted when specials are frozen, unless ZM takes control of a Tank.
 // 17. New cvar: zm_enable_control. Thanks carex53 for the idea.
-// 18. Infinite fallen survivors
+// 18. ZM flashlight performance improvements
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
@@ -281,10 +281,10 @@ public void OnPluginStart()
     g_hTraps = CreateConVar("zm_traps", "1", "Enable traps. 1: balanced traps. 2: balanced and experimental traps.", FCVAR_PROTECTED, true, 0.0, true, 2.0);
     g_hTraps.AddChangeHook(ConVarChanged_Cvars_ZMenu);
 
-    g_hPreview = CreateConVar("zm_preview", "1", "Enable previews of units.", FCVAR_PROTECTED, true, 0.0, true, 1.0);
+    g_hPreview = CreateConVar("zm_preview", "2", "Enable previews of units. 2 to cycle models.", FCVAR_PROTECTED, true, 0.0, true, 2.0);
     g_hPreview.AddChangeHook(ConVarChanged_Cvars_ZMenu);
 
-    g_hCvarCommonSequence = CreateConVar("zm_common_preview_sequence", "13", "Animation sequence for common infected previews.",FCVAR_PROTECTED,true,0.0,true,1000.0);
+    g_hCvarCommonSequence = CreateConVar("zm_common_preview_sequence", "13", "Animation sequence for common infected preview.",FCVAR_PROTECTED,true,0.0,true,1000.0);
     g_hCvarCommonSequence.AddChangeHook(ConVarChanged_Cvars_ZMenu);
 
     g_hCostExplosion = CreateConVar("zm_cost_explosion", "50", "Explosion trap cost. -1 to disable.", FCVAR_PROTECTED, true, -1.0, true, 1000.0);
@@ -1857,6 +1857,8 @@ public void OnMapStart()
 {
     if (DEBUG) LogMessage("[zm] OnMapStart");
 
+    //PluginPrecacheModel(MODEL_LIGHT);
+
 	PluginPrecacheModel(MODEL_SMOKER);
 	PluginPrecacheModel(MODEL_BOOMER);
 	PluginPrecacheModel(MODEL_HUNTER);
@@ -2101,7 +2103,7 @@ public void OnMapStart()
 	
 	g_bMapStarted = true;
     musicStringTank = "";
-    Reset_infected_Models();
+    ResetZombieModels();
     g_hIgnoreTankTimer = null;
     g_bIgnoreTankMusic = false;
 	
@@ -2136,7 +2138,7 @@ public void OnMapEnd()
     reset_time_of_day();
     Music_Monitor_Cleanup();
     musicStringTank = "";
-    Reset_infected_Models();
+    ResetZombieModels();
 }
 
 // this runs very frequently, find a better way.
@@ -2421,7 +2423,7 @@ public void OnPluginEnd()
     Music_Monitor_Disable();
     Music_Monitor_Cleanup();
     Music_TankDetour_Disable();
-    Reset_infected_Models();
+    ResetZombieModels();
     GameRules_SetProp("m_bChallengeModeActive", false, _, _, true);
 }
 

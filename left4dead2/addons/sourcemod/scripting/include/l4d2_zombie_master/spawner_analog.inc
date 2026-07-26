@@ -14,9 +14,9 @@
 int   g_iSpawnerZombieClass;
 bool g_bLastDoorValid = false;
 bool g_bSpawnerFilterZM = false; // mark cells invisible to ZM as invalid?
+
 bool g_bPreviewHidden;
 int g_iPreviewZombieClass;
-
 #define PREVIEW_GLOW_INTENSITY 50
 
 // Draw transparent zombie preview at pos
@@ -87,40 +87,33 @@ void draw_preview_zombie(const float pos[3], const int state = SPAWNER_OK, const
         }
     }
 
-    if (g_iLastZombieClass!=zClass) update_spawner_zombieclass(zClass,true);
+    bool class_changed = g_iPreviewZombieClass!=zClass; // should models be rerolled or not
+    if (class_changed) update_spawner_zombieclass(zClass,true);
 
     static char model[PLATFORM_MAX_PATH];
-    switch (zClass)
+    if (zClass==ZOMBIECLASS_COMMON) // Random Common Infected models every 1.5s
     {
-        case ZOMBIECLASS_BOOMER: model=MODEL_BOOMER;
-        case ZOMBIECLASS_CHARGER: model=MODEL_CHARGER;
-        case ZOMBIECLASS_HUNTER: model=MODEL_HUNTER;
-        case ZOMBIECLASS_JOCKEY: model=MODEL_JOCKEY;
-        case ZOMBIECLASS_SMOKER: model=MODEL_SMOKER;
-        case ZOMBIECLASS_SPITTER: model=MODEL_SPITTER;
-        case ZOMBIECLASS_TANK: model=MODEL_TANK;
-        case ZOMBIECLASS_WITCH: model=MODEL_WITCH;
-        default:
+        if (g_iPreviewZombieClass!=ZOMBIECLASS_COMMON)
         {
-            if (g_iPreviewZombieClass!=ZOMBIECLASS_COMMON)
+            GetRandomZombieModel(ZOMBIECLASS_COMMON,model);
+            t_last_infected_model = GetGameTime();
+        }
+        else
+        {
+            float t_now = GetGameTime();
+            if (FloatAbs(t_last_infected_model-t_now)>=1.5)
             {
-                GetRandomInfectedModel(model);
-                t_last_infected_model = GetGameTime();
+                t_last_infected_model = t_now;
+                GetRandomZombieModel(ZOMBIECLASS_COMMON,model);
             }
-            else
-            {
-                float t_now = GetGameTime();
-                if (FloatAbs(t_last_infected_model-t_now)>=1.5)
-                {
-                    t_last_infected_model = t_now;
-                    GetRandomInfectedModel(model);
-                }
-            }
-            if (model[0]==0) model = MODEL_COMMON;
         }
     }
+    else if (class_changed) // Random witch, SI models every class change
+    {
+        GetRandomZombieModel(zClass,model);
+    }
 
-    if (g_iPreviewZombieClass!=zClass && g_iPreviewZombieClass==ZOMBIECLASS_WITCH)
+    if (class_changed && g_iPreviewZombieClass==ZOMBIECLASS_WITCH)
     {
         delete_preview_zombie(); // prevent glowing eyes from transfering
     }

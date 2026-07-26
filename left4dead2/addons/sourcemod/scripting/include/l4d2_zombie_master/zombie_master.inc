@@ -80,6 +80,8 @@ float g_fTornadoImmuneUntil[MAXPLAYERS+1]; // per-client: fall-damage immune whi
 #define HULL_DZ_MIN_STRICT 20.0
 #define HULL_DZ_MAX_STRICT 50.0
 
+//#define MODEL_LIGHT "models/sprites/light_glow01.mdl"
+
 // TraceHull for obstruction
 static float HULL_MINS[3] = {-HULL_DX_STRICT,-HULL_DX_STRICT,HULL_DZ_MIN_STRICT};
 static float HULL_MAXS[3] = {HULL_DX_STRICT,HULL_DX_STRICT,HULL_DZ_MAX_STRICT};
@@ -112,18 +114,6 @@ static float HULL_MAXS_LOOK[3] = {HULL_DX,HULL_DX,HULL_DZ};
 #define EXPLOSION1 "ambient/explosions/explode_1.wav"
 #define EXPLOSION2 "ambient/explosions/explode_2.wav"
 #define EXPLOSION3 "ambient/explosions/explode_3.wav"
-
-#define MODEL_SMOKER "models/infected/smoker.mdl"
-#define MODEL_BOOMER "models/infected/boomer.mdl"
-#define MODEL_HUNTER "models/infected/hunter.mdl"
-#define MODEL_SPITTER "models/infected/spitter.mdl"
-#define MODEL_JOCKEY "models/infected/jockey.mdl"
-#define MODEL_CHARGER "models/infected/charger.mdl"
-#define MODEL_TANK "models/infected/hulk.mdl"
-
-#define MODEL_WITCH "models/infected/witch.mdl"
-#define MODEL_COMMON "models/infected/common_shadertest.mdl"
-// common_morph_test common_test
 
 // C:\Steam\steamapps\common\Left 4 Dead 2\left4dead2\sound\ambient\alarms\perimeter_alarm.wav
 
@@ -225,6 +215,8 @@ static float HULL_MAXS_LOOK[3] = {HULL_DX,HULL_DX,HULL_DZ};
 #define ZOMBIECLASS_CHARGER	 6
 #define ZOMBIECLASS_WITCH	 7
 #define ZOMBIECLASS_TANK	 8
+ArrayList g_hZombieModels[ZOMBIECLASS_TANK+1];
+bool g_bZombieModelsLoaded;
 
 // ZM stages
 #define ZM_NEWROUND 0 // Survivors in start area, no ZM picked.
@@ -314,6 +306,7 @@ int g_iLiveFallen;
 char zm_survivor_model[PLATFORM_MAX_PATH]; // keep zombie master survivor model in memory
 bool zm_draw_path;
 int entref_preview = INVALID_ENT_REFERENCE; // preview prop_dynamic zombie entity for spawner
+float t_last_infected_model; // for zm_preview
 bool g_bLastWitchMoving = true;
 float t_finale_change; // track last finale stage change so they don't last more than 5 minutes each.
 
@@ -1342,8 +1335,14 @@ Action ZM_Vision(int client, int args)
 int entref_light = INVALID_ENT_REFERENCE;
 Action TransmitZMLight(int entity, int client)
 {
-	if (!IsValidClientZM()) AcceptEntityInput(entity, "Kill");
-	if(client==zm_client) return Plugin_Continue;
+	if(client==zm_client)
+    {
+        //static float origin[3];
+        //GetClientEyePosition(zm_client,origin);
+        //TeleportEntity(entity, origin, NULL_VECTOR, NULL_VECTOR);
+        return Plugin_Continue;
+    }
+    if (!IsValidClientZM()) AcceptEntityInput(entity, "Kill");
 	return Plugin_Handled;
 }
 
@@ -1368,19 +1367,22 @@ void update_zm_flashlight()
     {
         if (IsPlayerAlive(zm_client))
         {
-            float vMin[3], vMax[3], vOffset[3];
+            static float vMin[3], vMax[3], vOffset[3];
             GetEntPropVector(zm_client, Prop_Send, "m_vecMins", vMin);
             GetEntPropVector(zm_client, Prop_Send, "m_vecMaxs", vMax);
+            GetClientEyePosition(zm_client, vMax);
+            GetClientAbsOrigin(zm_client, vMin);
             vOffset[2] = vMax[2] - vMin[2] + 1.0;
             TeleportEntity(entity,
                            vOffset,
+                           //view_as<float>({ 0.0, 0.0, 0.0 }),
                            view_as<float>({ -45.0, -45.0, 90.0 }),
                            NULL_VECTOR);
         }
         else
         {
             TeleportEntity(entity,
-                           view_as<float>({ 0.0, 0.0, 0.0 }),
+                           view_as<float>({ 0.0, 0.0, 15.0 }),
                            view_as<float>({ 0.0, 0.0, 0.0 }),
                            NULL_VECTOR);
         }
@@ -1408,21 +1410,16 @@ void toggle_ZM_vision(int client)
         if (observermode==4 || observermode==5) return;
         
         entity = CreateEntityByName("light_dynamic");
-    	if( entity == -1) return;
-        
-       	DispatchKeyValue(entity, "_light", "5 5 5 5");
+    	if(entity == -1) return;
+       	DispatchKeyValue(entity, "_light", "40 40 40");
        	DispatchKeyValue(entity, "brightness", "1");
-       	DispatchKeyValueFloat(entity, "spotlight_radius", 0.0);
-       	DispatchKeyValueFloat(entity, "distance", 3000.0);
+       	DispatchKeyValueFloat(entity, "distance", 1000.0);
+        DispatchKeyValueFloat(entity, "spotlight_radius", 0.0);
        	DispatchKeyValue(entity, "style", "0");
        	DispatchSpawn(entity);
+        SetVariantString("!activator");
+        AcceptEntityInput(entity, "SetParent", client);
        	AcceptEntityInput(entity, "TurnOn");
-       	SetVariantString("!activator");
-       	AcceptEntityInput(entity, "SetParent", client);
-       	TeleportEntity(entity,
-                       view_as<float>({ 0.0, 0.0, 0.0 }),
-                       view_as<float>({ 0.0, 0.0, 0.0 }),
-                       NULL_VECTOR);
 		entref_light = EntIndexToEntRef(entity);
 		SDKHook(entity, SDKHook_SetTransmit, TransmitZMLight);
 		update_zm_flashlight();

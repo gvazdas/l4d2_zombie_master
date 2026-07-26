@@ -1,95 +1,20 @@
-#if defined _zm_infected_included
+#if defined _zm_models_included
  #endinput
 #endif
-#define _zm_infected_included
+#define _zm_models_included
 
-// infected entity logistics
+#define MODEL_SMOKER "models/infected/smoker.mdl"
+#define MODEL_BOOMER "models/infected/boomer.mdl"
+#define MODEL_HUNTER "models/infected/hunter.mdl"
+#define MODEL_SPITTER "models/infected/spitter.mdl"
+#define MODEL_JOCKEY "models/infected/jockey.mdl"
+#define MODEL_CHARGER "models/infected/charger.mdl"
+#define MODEL_TANK "models/infected/hulk.mdl"
+#define MODEL_WITCH "models/infected/witch.mdl"
 
-bool g_bSkipModelPrecache = false; // set to true to disable modelprecache scan. if server is crashing.
-
-// Load all common infected models from modelprecache string table.
-bool g_bModelsLoaded;
-ArrayList g_infectedModels; // all infected models
-float t_last_infected_model;
-stock void Load_infected_Models()
-{
-	if (g_bModelsLoaded || g_bSkipModelPrecache) return;
-    int table = FindStringTable("modelprecache");
-	int total = GetStringTableNumStrings(table);
-	static char sTemp[PLATFORM_MAX_PATH];
-	delete g_infectedModels;
-	g_infectedModels = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH));
-	for( int i = 0; i < total; i++ )
-	{
-		ReadStringTable(table, i, sTemp, sizeof(sTemp)); // _w_ models appear to be gib related, i dont think they have this lag issue.
-		if( strncmp(sTemp,"models/infected/common",22)==0 && StrContains(sTemp,"_w_",false)<0 )
-		{
-        	g_infectedModels.PushString(sTemp);
-        }
-	}
-	if (DEBUG) LogMessage("modelprecache: %d models", g_infectedModels.Length);
-    g_bModelsLoaded = true;
-}
-
-// Clear all models and client cached states
-stock void Reset_infected_Models()
-{
-    delete g_infectedModels;
-    g_bModelsLoaded = false;
-}
-
-// Get a random infected model based on zm menu state and game rules.
-stock void GetRandomInfectedModel(char[] model, int size = PLATFORM_MAX_PATH)
-{
-    static int gender;
-    if (valid_uncommon(g_sForceCommon))
-    {
-        gender = label_to_gender(g_sForceCommon);
-        if (calculate_infected_cost(gender)>=0)
-        {
-            infected_gender_to_model(gender,model);
-            if (model[0]!=0) return;
-        }
-    }
-    if (zm_menu_state == ZM_MENU_UNCOMMON || g_iCostCommon<0)
-    {
-        gender = label_to_gender("random");
-        if (calculate_infected_cost(gender)>=0)
-        {
-            infected_gender_to_model(gender,model);
-            if (model[0]!=0) return;
-        }
-    }
-    if (zm_menu_state == ZM_MENU_BOSS)
-    {
-        switch(GetRandomInt(0,1))
-        {
-            case 0: infected_gender_to_model(TYPE_JIMMY_GIBBS,model);
-            default: infected_gender_to_model(TYPE_FALLEN,model);
-        }
-        if (model[0]!=0) return;
-    }
-    //if (GetRandomFloat()>0.5)
-    //{
-    //    strcopy(model,size,MODEL_COMMON);
-    //    if (model[0]!=0) return;
-    //}
-    Load_infected_Models();
-    if (g_infectedModels == null || g_infectedModels.Length<=0)
-    {
-        strcopy(model,size,MODEL_COMMON);
-        return;
-    }
-    if (g_infectedModels.Length==1)
-    {
-        g_infectedModels.GetString(0,model,size);
-        if (model[0]!=0) return;
-    }
-    int i = GetRandomInt(0,g_infectedModels.Length-1);
-    g_infectedModels.GetString(i,model,size);
-    if (model[0]!=0) return;
-    strcopy(model,size,MODEL_COMMON);
-}
+// Common Infected
+#define MODEL_COMMON "models/infected/common_shadertest.mdl"
+// common_morph_test common_test
 
 #define MODEL_RIOT "models/infected/common_male_riot.mdl"
 #define MODEL_RIOT2 "models/infected/common_male_riot_l4d1.mdl"
@@ -234,25 +159,6 @@ stock void infected_gender_to_model(const int gender = TYPE_COMMON, char model[P
     }
 }
 
-// Calculate cost to spawn infected entity. -1 if spawning is illegal.
-stock int calculate_infected_cost(const int gender = 1, const bool angry = false)
-{
-    int cost = 0;
-    if (gender==TYPE_RIOT) cost = g_hCostRiot.IntValue;
-    else if (gender>=TYPE_CEDA) cost = g_iCostUncommon;
-    else cost = g_iCostCommon;
-
-    if (cost<0) return -1;
-
-    if (angry)
-    {
-        if (g_hCostAngry.IntValue<0) return -1;
-        cost += g_hCostAngry.IntValue;
-    }
-
-    return cost;
-}
-
 stock bool valid_uncommon(const char arg[16])
 {
     if (strcmp(arg,"",false)==0 || arg[0]==0 || arg[0]==' ') return false;
@@ -284,6 +190,116 @@ stock bool valid_uncommon(const char arg[16])
     }
 	return false;
 }
+
+
+stock void ResetZombieModels()
+{
+    for(int i = 0; i < sizeof(g_hZombieModels); i++)
+    {
+        delete g_hZombieModels[i];
+        g_hZombieModels[i] = null;
+    }
+    g_bZombieModelsLoaded = false;
+}
+
+stock void AddZombieModel(const int zClass, char[] model)
+{
+    if (g_hZombieModels[zClass]==null) g_hZombieModels[zClass] = new ArrayList(ByteCountToCells(PLATFORM_MAX_PATH))
+    if (DEBUG) LogMessage("AddZombieModel %d %s", zClass, model);
+    g_hZombieModels[zClass].PushString(model);
+}
+
+// Get a random zombie model based on zm menu state and game rules.
+stock void GetRandomZombieModel(const int zClass, char[] model, const int size = PLATFORM_MAX_PATH)
+{
+    if (zClass==ZOMBIECLASS_COMMON)
+    {
+        static int gender;
+        if (valid_uncommon(g_sForceCommon))
+        {
+            gender = label_to_gender(g_sForceCommon);
+            if (calculate_infected_cost(gender)>=0)
+            {
+                infected_gender_to_model(gender,model);
+                if (model[0]!=0) return;
+            }
+        }
+        if (zm_menu_state == ZM_MENU_UNCOMMON || g_iCostCommon<0)
+        {
+            gender = label_to_gender("random");
+            if (calculate_infected_cost(gender)>=0)
+            {
+                infected_gender_to_model(gender,model);
+                if (model[0]!=0) return;
+            }
+        }
+        if (zm_menu_state == ZM_MENU_BOSS)
+        {
+            switch(GetRandomInt(0,1))
+            {
+                case 0: infected_gender_to_model(TYPE_JIMMY_GIBBS,model);
+                default: infected_gender_to_model(TYPE_FALLEN,model);
+            }
+            if (model[0]!=0) return;
+        }
+    }
+    ReadZombieModels();
+    if (g_hZombieModels[zClass]!=null && g_hZombieModels[zClass].Length>0)
+    {
+        int i = 0;
+        if (g_hZombieModels[zClass].Length>1) i = GetRandomInt(0,g_hZombieModels[zClass].Length-1);
+        g_hZombieModels[zClass].GetString(i,model,size);
+        if (model[0]!=0) return;
+    }
+    switch (zClass)
+    {
+        case ZOMBIECLASS_BOOMER: strcopy(model,size,MODEL_BOOMER);
+        case ZOMBIECLASS_CHARGER: strcopy(model,size,MODEL_CHARGER);
+        case ZOMBIECLASS_HUNTER: strcopy(model,size,MODEL_HUNTER);
+        case ZOMBIECLASS_JOCKEY: strcopy(model,size,MODEL_JOCKEY);
+        case ZOMBIECLASS_SMOKER: strcopy(model,size,MODEL_SMOKER);
+        case ZOMBIECLASS_SPITTER: strcopy(model,size,MODEL_SPITTER);
+        case ZOMBIECLASS_TANK: strcopy(model,size,MODEL_TANK);
+        case ZOMBIECLASS_WITCH: strcopy(model,size,MODEL_WITCH);
+        default: strcopy(model,size,MODEL_COMMON);
+    }
+}
+
+// Find all precached common infected, special infected and witch models in modelprecache stringtable.
+// Thanks SilverShot for figuring this out
+stock void ReadZombieModels()
+{
+	if (g_bZombieModelsLoaded || g_hPreview.IntValue<=1) return;
+    int table = FindStringTable("modelprecache");
+	int total = GetStringTableNumStrings(table);
+	static char sTemp[PLATFORM_MAX_PATH];
+	for( int i = 0; i < total; i++ )
+	{
+		ReadStringTable(table, i, sTemp, sizeof(sTemp));
+        if (strncmp(sTemp,"models/infected",15,false)!=0) continue;
+        if (StrContains(sTemp,"_w_",false)>=0) continue;
+
+		if (strncmp(sTemp,"models/infected/common",22,false)==0) AddZombieModel(ZOMBIECLASS_COMMON,sTemp);
+        else if(strncmp(sTemp,"models/infected/smoker",22,false)==0)
+        {
+            if (StrContains(sTemp,"tongue",false)>=0) continue;
+            AddZombieModel(ZOMBIECLASS_SMOKER,sTemp);
+        }
+        else if(strncmp(sTemp,"models/infected/boome",21,false)==0) AddZombieModel(ZOMBIECLASS_BOOMER,sTemp);
+        else if(strncmp(sTemp,"models/infected/hunter",22,false)==0) AddZombieModel(ZOMBIECLASS_HUNTER,sTemp);
+        else if(strncmp(sTemp,"models/infected/spitter",23,false)==0) AddZombieModel(ZOMBIECLASS_SPITTER,sTemp);
+        else if(strncmp(sTemp,"models/infected/jockey",22,false)==0) AddZombieModel(ZOMBIECLASS_JOCKEY,sTemp);
+        else if(strncmp(sTemp,"models/infected/charger",23,false)==0) AddZombieModel(ZOMBIECLASS_CHARGER,sTemp);
+        else if(strncmp(sTemp,"models/infected/witch",21,false)==0) AddZombieModel(ZOMBIECLASS_WITCH,sTemp);
+        else if(strncmp(sTemp,"models/infected/hulk",20,false)==0) AddZombieModel(ZOMBIECLASS_TANK,sTemp);
+	}
+    g_bZombieModelsLoaded = true;
+}
+
+
+
+
+
 
 // DEPRECATED
 stock void get_uncommon_model(const char label[16], char model[PLATFORM_MAX_PATH])
