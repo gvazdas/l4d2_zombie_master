@@ -2637,7 +2637,7 @@ stock bool adjacent_connected(Address from, Address to)
 ArrayList ladders1, ladders2;
 
 // Return func_simpleladder connecting from -> to. returns -1 on failure.
-stock int ladder_from_to(Address from, Address to, int team = TEAM_SURVIVOR)
+stock int ladder_from_to(Address from, Address to, int team = TEAM_SURVIVOR, bool verify = true)
 {
     if (from == Address_Null || to == Address_Null) return -1;
     if (ladders1 == null) ladders1 = new ArrayList();
@@ -2658,6 +2658,12 @@ stock int ladder_from_to(Address from, Address to, int team = TEAM_SURVIVOR)
         {
             if (ladders2.Get(i2)==ladder)
             {
+                if (verify) // verify classname
+                {
+                    static char class[32];
+                    GetEntityClassname(ladder,class,sizeof(class));
+                    if (strncmp(class,"func_simpleladder",17,false)!=0) continue;
+                }
                 int team_ladder = GetEntProp(ladder, Prop_Send, "m_iTeamNum");
                 if (team_ladder==0 || team_ladder==team) return ladder;
             }
@@ -2667,7 +2673,7 @@ stock int ladder_from_to(Address from, Address to, int team = TEAM_SURVIVOR)
 }
 
 // Find other navAreas connected to navArea via ladder.
-stock int navArea_ladder_navAreas(Address from, ArrayList navList, int team = TEAM_SURVIVOR)
+stock int navArea_ladder_navAreas(Address from, ArrayList navList, int team = TEAM_SURVIVOR, bool verify = true)
 {
     if (from==Address_Null || !elevator_available) return 0;
     if (ladders1 == null) ladders1 = new ArrayList();
@@ -2681,6 +2687,12 @@ stock int navArea_ladder_navAreas(Address from, ArrayList navList, int team = TE
     {
         int ladder = ladders1.Get(i);
         if (ladder<=0 || !IsValidEntity(ladder)) continue;
+        if (verify) // verify classname
+        {
+            static char class[32];
+            GetEntityClassname(ladder,class,sizeof(class));
+            if (strncmp(class,"func_simpleladder",17,false)!=0) continue;
+        }
         int team_ladder = GetEntProp(ladder, Prop_Send, "m_iTeamNum");
         if (team_ladder!=0 && team_ladder!=team) continue;
         static float pos1[3],pos2[3];
@@ -2709,9 +2721,9 @@ stock int NavArea_GetLadders(Address navArea, ArrayList ladderList)
 stock int elevator_from_to(Address from, Address to)
 {
     if (!elevator_available || from == Address_Null || to == Address_Null) return -1;
-    int elevator = L4D_NavArea_GetElevator(from);
+    int elevator = NavArea_GetElevator(from);
     if (elevator<=0 || !IsValidEntity(elevator)) return -1;
-    if (elevator == L4D_NavArea_GetElevator(to)) return elevator;
+    if (elevator == NavArea_GetElevator(to)) return elevator;
     return -1;
 }
 
@@ -2719,7 +2731,7 @@ stock int elevator_from_to(Address from, Address to)
 stock Address navArea_elevator_navArea(Address from)
 {
     if (from==Address_Null || !elevator_available) return Address_Null;
-    int elevator = L4D_NavArea_GetElevator(from);
+    int elevator = NavArea_GetElevator(from);
     if (elevator<=0 || !IsValidEntity(elevator)) return Address_Null;
     static float start[3],pos[3],pos1[3],pos2[3];
     L4D_GetNavAreaCenter(from,start);
@@ -2731,6 +2743,19 @@ stock Address navArea_elevator_navArea(Address from)
     Address to = L4D_GetNearestNavArea(pos2,500.0,true,false,false,TEAM_SURVIVOR);
     if (to==Address_Null || to==from) return Address_Null;
     return to;
+}
+
+// Wrapper for L4D_NavArea_GetElevator with classname verification.
+// Fixes exception in custom campaign "Military Industrial Complex II"
+stock int NavArea_GetElevator(const Address from)
+{
+    if (from==Address_Null || !elevator_available) return -1;
+    int elevator = L4D_NavArea_GetElevator(from);
+    if (elevator<=0 || !IsValidEntity(elevator)) return -1;
+    static char class[16];
+    GetEntityClassname(elevator,class,sizeof(class));
+    if (strncmp(class,"func_elevator",13,false)==0) return elevator;
+    return -1;
 }
 
 // Check if nav area is relevant to survivor escape path.
