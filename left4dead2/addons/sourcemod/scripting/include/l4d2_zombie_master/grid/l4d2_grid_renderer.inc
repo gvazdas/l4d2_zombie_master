@@ -163,22 +163,19 @@ stock void GridRenderer_HideAll(int client)
  */
 stock void GridRenderer_ResolveColor(bool isValid, bool isClosest, int color[4], int context = SPAWNER_OK)
 {
-	if (isClosest && g_iSpawnerMode==2)
+	bool highlight = isClosest && g_iSpawnerMode == 2;
+	bool conditional = context > SPAWNER_NAV;
+
+	if (highlight)
 	{
-		if (isValid) color = GRIDRENDERER_COLOR_HIGHLIGHT;
-		else
-		{
-			if (context>SPAWNER_NAV) color = GRIDRENDERER_COLOR_HIGHLIGHT_CONDITIONAL;
-			else color = GRIDRENDERER_COLOR_HIGHLIGHT_BLOCKED;
-		}
+		if (isValid)          color = GRIDRENDERER_COLOR_HIGHLIGHT;
+		else if (conditional) color = GRIDRENDERER_COLOR_HIGHLIGHT_CONDITIONAL;
+		else                  color = GRIDRENDERER_COLOR_HIGHLIGHT_BLOCKED;
 	}
 	else
 	{
-		if (isValid) color = GRIDRENDERER_COLOR_VALID;
-		else
-		{
-			if (context>SPAWNER_NAV) color = GRIDRENDERER_COLOR_CONDITIONAL;
-            else color = GRIDRENDERER_COLOR_BLOCKED;
-		}
+		if (isValid)          color = GRIDRENDERER_COLOR_VALID;
+		else if (conditional) color = GRIDRENDERER_COLOR_CONDITIONAL;
+		else                  color = GRIDRENDERER_COLOR_BLOCKED;
 	}
 }
