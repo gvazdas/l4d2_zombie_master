@@ -1326,113 +1326,6 @@ float get_bank_rate()
     return bank_rate;
 }
 
-Action ZM_Vision(int client, int args)
-{
-   toggle_ZM_vision(client);
-   return Plugin_Continue;
-}
-
-int entref_light = INVALID_ENT_REFERENCE;
-Action TransmitZMLight(int entity, int client)
-{
-	if(client==zm_client)
-    {
-        //static float origin[3];
-        //GetClientEyePosition(zm_client,origin);
-        //TeleportEntity(entity, origin, NULL_VECTOR, NULL_VECTOR);
-        return Plugin_Continue;
-    }
-    if (!IsValidClientZM()) AcceptEntityInput(entity, "Kill");
-	return Plugin_Handled;
-}
-
-// Update z position of ZM light if they are in free look vs spectating a target or alive.
-void update_zm_flashlight()
-{
-    if (!IsValidEntRef(entref_light)) return;
-    int entity = EntRefToEntIndex(entref_light);
-    if (!IsValidEntity(entity)) return;
-    if (!IsValidClientZM()) return;
-    int observermode = GetEntProp(zm_client, Prop_Send, "m_iObserverMode");
-    int lastlook = -1;
-    if (observermode==4 || observermode==5)
-        lastlook = GetEntPropEnt(zm_client, Prop_Send, "m_hObserverTarget");
-    if (lastlook>0 && IsValidEntity(lastlook))
-    {
-        // Prevent flicker
-        AcceptEntityInput(entity, "Kill");
-    	entref_light = INVALID_ENT_REFERENCE;
-    }
-    else
-    {
-        if (IsPlayerAlive(zm_client))
-        {
-            static float vMin[3], vMax[3], vOffset[3];
-            GetEntPropVector(zm_client, Prop_Send, "m_vecMins", vMin);
-            GetEntPropVector(zm_client, Prop_Send, "m_vecMaxs", vMax);
-            GetClientEyePosition(zm_client, vMax);
-            GetClientAbsOrigin(zm_client, vMin);
-            vOffset[2] = vMax[2] - vMin[2] + 1.0;
-            TeleportEntity(entity,
-                           vOffset,
-                           //view_as<float>({ 0.0, 0.0, 0.0 }),
-                           view_as<float>({ -45.0, -45.0, 90.0 }),
-                           NULL_VECTOR);
-        }
-        else
-        {
-            TeleportEntity(entity,
-                           view_as<float>({ 0.0, 0.0, 15.0 }),
-                           view_as<float>({ 0.0, 0.0, 0.0 }),
-                           NULL_VECTOR);
-        }
-    }
-    
-}
-
-// l4d_flashlight by Silvers
-void toggle_ZM_vision(int client)
-{
-    if (!g_bCvarAllow || !IsValidClient(client)) return;
-    if (client!=zm_client) return;
-    
-    if (is_zm_spamming()) return;
-    
-    int entity;
-    if (IsValidEntRef(entref_light)) entity = EntRefToEntIndex(entref_light);
-    else entity = -1;
-    
-    if (!IsValidEntity(entity))
-    {
-        
-        // No dynamic light when observing somebody. Prevents flicker.
-        int observermode = GetEntProp(client, Prop_Send, "m_iObserverMode");
-        if (observermode==4 || observermode==5) return;
-        
-        entity = CreateEntityByName("light_dynamic");
-    	if(entity == -1) return;
-       	DispatchKeyValue(entity, "_light", "40 40 40");
-       	DispatchKeyValue(entity, "brightness", "1");
-       	DispatchKeyValueFloat(entity, "distance", 1000.0);
-        DispatchKeyValueFloat(entity, "spotlight_radius", 0.0);
-       	DispatchKeyValue(entity, "style", "0");
-       	DispatchSpawn(entity);
-        SetVariantString("!activator");
-        AcceptEntityInput(entity, "SetParent", client);
-       	AcceptEntityInput(entity, "TurnOn");
-		entref_light = EntIndexToEntRef(entity);
-		SDKHook(entity, SDKHook_SetTransmit, TransmitZMLight);
-		update_zm_flashlight();
-    }
-	else
-	{
-    	AcceptEntityInput(entity, "Kill");
-    	entref_light = INVALID_ENT_REFERENCE;
-	}
-	
-    EmitSoundToClient(client,SOUND_VISION);
-}
-
 stock void ZM_Sound_Deny()
 {
     EmitSoundToClient(zm_client,SOUND_DENY,_,_,_,_,0.5);
@@ -2893,6 +2786,7 @@ void JoinZM_Post(int client)
     ZMPrefs_Apply(client);
     g_iLastZombieClass = -1;
     Spawner_OnEnabled(client);
+    ZM_Vision_Cleanup();
     update_menus();
     spawner_last_valid = false;
     GetClientName(client,name,sizeof(name));
@@ -3040,6 +2934,7 @@ void QuitZM(int client, bool print = true)
            }
            DispatchKeyValue(zm_client, "targetname", "client");
        }
+       ZM_Vision_Cleanup();
        Spawner_OnDisabled(zm_client);
        remove_all_ZM_glows();
        delete_preview_zombie();

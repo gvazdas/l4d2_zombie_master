@@ -34,12 +34,13 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.36f 2026-07-26"
+#define PLUGIN_VERSION 			"0.9.36h 2026-07-29"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
 #include <l4d2_zombie_master/zombie_master>
 #include <l4d2_zombie_master/models>
+#include <l4d2_zombie_master/flashlight>
 #include <l4d2_grid_lib>
 #include <l4d2_zombie_master/sdk>
 #include <l4d2_zombie_master/music>
@@ -100,7 +101,7 @@ public Plugin myinfo =
 // 15. Hardcoded 5 minute timer for finale stage change if ZM has not used enough bank.
 // 16. Tank music is muted when specials are frozen, unless ZM takes control of a Tank.
 // 17. New cvar: zm_enable_control. Thanks carex53 for the idea.
-// 18. ZM flashlight performance improvements
+// 18. Better ZM flashlight
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
@@ -1133,6 +1134,7 @@ Action zm_new_round(Handle timer = null)
         GridLib_StartPrecomputation();
     }
     Spawner_Init();
+    ZM_Vision_Cleanup();
     if (g_CellCooldown) g_CellCooldown.Clear();
     cellcache_clear_all();
 
@@ -2106,6 +2108,7 @@ public void OnMapStart()
     ResetZombieModels();
     g_hIgnoreTankTimer = null;
     g_bIgnoreTankMusic = false;
+    ZM_Vision_Cleanup();
 	
 }
 
@@ -2139,6 +2142,7 @@ public void OnMapEnd()
     Music_Monitor_Cleanup();
     musicStringTank = "";
     ResetZombieModels();
+    ZM_Vision_Cleanup();
 }
 
 // this runs very frequently, find a better way.
@@ -2423,6 +2427,7 @@ public void OnPluginEnd()
     Music_Monitor_Disable();
     Music_Monitor_Cleanup();
     Music_TankDetour_Disable();
+    ZM_Vision_Cleanup();
     ResetZombieModels();
     GameRules_SetProp("m_bChallengeModeActive", false, _, _, true);
 }
