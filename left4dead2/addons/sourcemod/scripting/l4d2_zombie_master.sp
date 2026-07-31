@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.36h 2026-07-29"
+#define PLUGIN_VERSION 			"0.9.36j 2026-07-30"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -1823,7 +1823,9 @@ public Action evtPlayerDeath(Event event, const char[] name, bool dontBroadcast)
 Action ZM_Delayed_Cry(Handle timer, char[] sound)
 {
     if (!IsValidClientZM()) return Plugin_Stop;
-    EmitSoundToAll(sound,zm_client,SNDCHAN_VOICE,SNDLEVEL_GUNFIRE,_,SNDVOL_NORMAL,GetRandomInt(95,105),_,_,_,false);
+    //static float pos[3];
+    //GetClientEyePosition(zm_client,pos);
+    EmitSoundToAll(sound,zm_client,_,SNDLEVEL_GUNFIRE,_,SNDVOL_NORMAL,GetRandomInt(95,105));
     return Plugin_Stop;
 }
 
@@ -1921,10 +1923,13 @@ public void OnMapStart()
     PrecacheSound(SOUND_GNOMED);
 
     PrecacheSound(SOUND_TORNADO_ALARM);
+    PrecacheSound(SOUND_EXPLOSION_ALERT);
     
     PrecacheSound(EXPLOSION1);
     PrecacheSound(EXPLOSION2);
     PrecacheSound(EXPLOSION3);
+
+
 
     // Precache Special Infected bacterias
     for(int i = 1; i <= ZOMBIECLASS_TANK; i++)
@@ -2022,6 +2027,9 @@ public void OnMapStart()
             AddFileToDownloadsTable(buffer);
 
             Format(buffer, sizeof(buffer), "sound/%s", SOUND_GNOMED);
+            AddFileToDownloadsTable(buffer);
+
+            Format(buffer, sizeof(buffer), "sound/%s", SOUND_EXPLOSION_ALERT);
             AddFileToDownloadsTable(buffer);
 
             AddFileToDownloadsTable(VMT_GNOME);

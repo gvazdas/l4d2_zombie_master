@@ -15,6 +15,8 @@ enum struct zm_trap
     int state;       // ZM_TRAP_STATE_*
     int costPaid;
     float armedAt;
+    int roundcount;
+    float pos[3];
 
     void Clear()
     {
@@ -27,6 +29,8 @@ enum struct zm_trap
         this.state = ZM_TRAP_STATE_FREE;
         this.costPaid = 0;
         this.armedAt = 0.0;
+        this.roundcount = -1;
+        this.pos = NULL_VECTOR;
     }
 }
 
@@ -155,6 +159,7 @@ stock int Trap_Register(int type, int effect, int entity)
     g_Traps[slot].state = ZM_TRAP_STATE_ARMED;
     g_Traps[slot].costPaid = cost;
     g_Traps[slot].armedAt = GetGameTime();
+    g_Traps[slot].roundcount = roundcount;
     bank -= cost;
     return slot;
 }
