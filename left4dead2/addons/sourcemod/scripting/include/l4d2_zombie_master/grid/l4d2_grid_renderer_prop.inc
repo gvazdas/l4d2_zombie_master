@@ -314,7 +314,7 @@ stock int GridRendererProp_DrawCells(int client,
 
 			int color[4];
 			bool isClosest = (i == closestValidIdx);
-			int cellClass = GridRenderer_ClassifyCell(cellValid[i], g_GridCellContext[i], g_GridCellCooldown[i]);
+			int cellClass = GridRenderer_ClassifyCell(cellValid[i], g_GridCellContext[i]);
 			GridRenderer_ResolveColor(cellClass, isClosest, color);
 			color[3] = GridRendererProp_ComputeAlpha(i, count, isClosest, g_GridCellContext[i]);
 
@@ -348,7 +348,7 @@ stock int GridRendererProp_DrawCells(int client,
 		// Update color (and ensure visible)
 		int color[4];
 		bool isClosest = (dataIdx == closestValidIdx);
-		int cellClass = GridRenderer_ClassifyCell(cellValid[dataIdx], g_GridCellContext[dataIdx], g_GridCellCooldown[dataIdx]);
+		int cellClass = GridRenderer_ClassifyCell(cellValid[dataIdx], g_GridCellContext[dataIdx]);
 		GridRenderer_ResolveColor(cellClass, isClosest, color);
 		color[3] = GridRendererProp_ComputeAlpha(dataIdx, count, isClosest, g_GridCellContext[dataIdx]);
 

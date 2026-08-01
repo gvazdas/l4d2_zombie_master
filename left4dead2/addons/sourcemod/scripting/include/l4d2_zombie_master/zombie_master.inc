@@ -361,7 +361,6 @@ bool   g_bGridSurvivorBeamDrawn;
 float  g_GridValidPositions[GRID_MAX_CELLS][3];
 bool   g_GridValidFlags[GRID_MAX_CELLS];
 int    g_GridCellContext[GRID_MAX_CELLS];
-bool   g_GridCellCooldown[GRID_MAX_CELLS];
 int    g_GridCellIndices[GRID_MAX_CELLS];
 int    g_GridCellCount;
 int    g_GridValidCellCount;

@@ -169,16 +169,11 @@ stock void GridRenderer_HideAll(int client)
  *
  * @param isValid     Cell passed every validation check
  * @param context     Cell's g_GridCellContext value (a SPAWNER_* constant)
- * @param onCooldown  Cell was rejected by the cell cooldown cache rather than by a
- *                    live survivor sightline. Cooldown rejections report
- *                    SPAWNER_SIGHT, so without this flag they would draw an eye on
- *                    a cell nobody is looking at.
  * @return            One of the GRIDCELL_CLASS_* constants
  */
-stock int GridRenderer_ClassifyCell(bool isValid, int context, bool onCooldown)
+stock int GridRenderer_ClassifyCell(bool isValid, int context)
 {
-	if (isValid)    return GRIDCELL_CLASS_VALID;
-	if (onCooldown) return GRIDCELL_CLASS_UNKNOWN;
+	if (isValid) return GRIDCELL_CLASS_VALID;
 
 	switch (context)
 	{

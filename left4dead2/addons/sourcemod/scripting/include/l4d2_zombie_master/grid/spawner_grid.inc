@@ -207,9 +207,10 @@ static bool Grid_ValidateCell(int idx, float pos[3], Address navArea, bool obstr
         return false;
     }
 
-    if (cell_cooldown(g_GridCellIndices[idx]))
+    int cooldownContext;
+    if (cell_cooldown(g_GridCellIndices[idx], cooldownContext))
     {
-       g_iGridValidateContext = SPAWNER_SIGHT;
+       g_iGridValidateContext = cooldownContext;
        g_bGridValidateCooldown = true;
        return false;
     }
@@ -406,7 +407,6 @@ Action Grid_TimerUpdate(Handle timer, int userid)
     {
         g_GridHasOverride[i] = false;
         g_GridOverrideFlat[i] = false;
-        g_GridCellCooldown[i] = false;
     }
 
     // Validate each cell
@@ -443,7 +443,6 @@ Action Grid_TimerUpdate(Handle timer, int userid)
 
         cellValid[i] = Grid_ValidateCell(i, pos, navArea, obstructed, zClass);
         g_GridCellContext[i] = g_iGridValidateContext;
-        g_GridCellCooldown[i] = g_bGridValidateCooldown;
         float dist = GetVectorDistance(aimPos, pos);
         if (dist<closestDist)
         {
@@ -478,9 +477,9 @@ Action Grid_TimerUpdate(Handle timer, int userid)
                     GridRenderer_HideAll(client);
                     break;
                 }
-                else if (!g_bGridValidateCooldown) set_cell_cooldown(cell);
+                else if (!g_bGridValidateCooldown) set_cell_cooldown(cell, g_iGridValidateContext);
             }
-            else if (!g_bGridValidateCooldown) set_cell_cooldown(cell);
+            else if (!g_bGridValidateCooldown) set_cell_cooldown(cell, g_iGridValidateContext);
         }
         
     }
