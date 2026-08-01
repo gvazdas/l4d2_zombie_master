@@ -43,6 +43,15 @@
 #define GRIDRENDERER_COLOR_CONDITIONAL           {0, 0,   100, 255}      // Dark blue
 #define GRIDRENDERER_COLOR_HIGHLIGHT_CONDITIONAL {0, 128, 255, 255}    // ???
 
+#define GRIDRENDERER_COLOR_PENDING           {40, 90, 200, 255}
+#define GRIDRENDERER_COLOR_HIGHLIGHT_PENDING {90, 170, 255, 255}
+
+#define GRIDCELL_CLASS_VALID   0
+#define GRIDCELL_CLASS_SEEN    1
+#define GRIDCELL_CLASS_NEAR    2
+#define GRIDCELL_CLASS_DEAD    3
+#define GRIDCELL_CLASS_UNKNOWN 4
+
 // ============================================================================
 // Include Prop Backend
 // ============================================================================
@@ -155,30 +164,58 @@ stock void GridRenderer_HideAll(int client)
 // ============================================================================
 
 /**
- * Resolve color for a cell based on its validation state and highlight status
+ * Reduce a cell's validation result to the class that drives both its colour and
+ * its skin.
  *
- * @param isValid     Whether the cell is a valid spawn
- * @param isClosest   Whether this is the closest valid cell (highlighted)
- * @param color       Output RGBA color array
+ * @param isValid     Cell passed every validation check
+ * @param context     Cell's g_GridCellContext value (a SPAWNER_* constant)
+ * @return            One of the GRIDCELL_CLASS_* constants
  */
-stock void GridRenderer_ResolveColor(bool isValid, bool isClosest, int color[4], int context = SPAWNER_OK)
+stock int GridRenderer_ClassifyCell(bool isValid, int context)
 {
-	if (isClosest && g_iSpawnerMode==2)
+	if (isValid) return GRIDCELL_CLASS_VALID;
+
+	switch (context)
 	{
-		if (isValid) color = GRIDRENDERER_COLOR_HIGHLIGHT;
-		else
+		case SPAWNER_SIGHT:    return GRIDCELL_CLASS_SEEN;
+		case SPAWNER_DISTANCE: return GRIDCELL_CLASS_NEAR;
+		case SPAWNER_NAV, SPAWNER_INVALID, SPAWNER_OTHER: return GRIDCELL_CLASS_DEAD;
+	}
+
+	return GRIDCELL_CLASS_UNKNOWN;
+}
+
+/**
+ * Resolve the render tint for a cell from its class.
+ *
+ * @param cellClass   GRIDCELL_CLASS_* from GridRenderer_ClassifyCell
+ * @param isClosest   Whether this is the closest valid cell (highlighted)
+ * @param color       Output RGBA colour array
+ */
+stock void GridRenderer_ResolveColor(int cellClass, bool isClosest, int color[4])
+{
+	bool highlight = isClosest && g_iSpawnerMode == 2;
+
+	if (highlight)
+	{
+		switch (cellClass)
 		{
-			if (context>SPAWNER_NAV) color = GRIDRENDERER_COLOR_HIGHLIGHT_CONDITIONAL;
-			else color = GRIDRENDERER_COLOR_HIGHLIGHT_BLOCKED;
+			case GRIDCELL_CLASS_VALID:            color = GRIDRENDERER_COLOR_HIGHLIGHT;
+			case GRIDCELL_CLASS_SEEN, GRIDCELL_CLASS_NEAR:
+			                                      color = GRIDRENDERER_COLOR_HIGHLIGHT_PENDING;
+			case GRIDCELL_CLASS_DEAD:             color = GRIDRENDERER_COLOR_HIGHLIGHT_BLOCKED;
+			default:                              color = GRIDRENDERER_COLOR_HIGHLIGHT_CONDITIONAL;
 		}
 	}
 	else
 	{
-		if (isValid) color = GRIDRENDERER_COLOR_VALID;
-		else
+		switch (cellClass)
 		{
-			if (context>SPAWNER_NAV) color = GRIDRENDERER_COLOR_CONDITIONAL;
-            else color = GRIDRENDERER_COLOR_BLOCKED;
+			case GRIDCELL_CLASS_VALID:            color = GRIDRENDERER_COLOR_VALID;
+			case GRIDCELL_CLASS_SEEN, GRIDCELL_CLASS_NEAR:
+			                                      color = GRIDRENDERER_COLOR_PENDING;
+			case GRIDCELL_CLASS_DEAD:             color = GRIDRENDERER_COLOR_BLOCKED;
+			default:                              color = GRIDRENDERER_COLOR_CONDITIONAL;
 		}
 	}
 }

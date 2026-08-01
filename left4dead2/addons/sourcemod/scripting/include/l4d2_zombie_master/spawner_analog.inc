@@ -664,7 +664,7 @@ int SpawnerCellFilter(int cellIdx)
         distance_last = distance_last_saferoom(cellPos);
         if (distance_last>0.0 && distance_last_saferoom(cellPos)<DISTANCE_LAST_SAFEROOM) // prevent last saferoom abuse
         {
-            set_cell_cooldown(cellIdx);
+            set_cell_cooldown(cellIdx, SPAWNER_INVALID);
             return GRIDLIB_FILTER_DISCARD;
         }
     }
@@ -683,7 +683,7 @@ int SpawnerCellFilter(int cellIdx)
     {
         if (DEBUG_SPAWNER) LogMessage("[zm] SpawnerCellFilter: cell %d visible to survivors", cellIdx);
         {
-            set_cell_cooldown(cellIdx);
+            set_cell_cooldown(cellIdx, SPAWNER_SIGHT);
             return GRIDLIB_FILTER_DISCARD;
         }
     }
@@ -701,7 +701,7 @@ int SpawnerCellFilter(int cellIdx)
         if (minDist >= 0.0 && minDist < g_fSpawnMinDistance)
         {
             if (DEBUG_SPAWNER) LogMessage("[zm] SpawnerCellFilter: cell %d too close (%.0f)", cellIdx, minDist);
-            set_cell_cooldown(cellIdx);
+            set_cell_cooldown(cellIdx, SPAWNER_DISTANCE);
             return GRIDLIB_FILTER_DISCARD;
         }
     }

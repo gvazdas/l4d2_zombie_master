@@ -172,9 +172,11 @@ static bool Grid_CheckObstruction(int idx, float pos[3], bool obstructed)
 // Run min_distance_to_survivors with store_client set to True until a valid survivor is hit with the grid cells. Then call the rest with
 // This will allow flow spawns to function as intended.
 int g_iGridValidateContext; // spawner context state
+bool g_bGridValidateCooldown; // set by Grid_ValidateCell when the cooldown cache did the rejecting
 static bool Grid_ValidateCell(int idx, float pos[3], Address navArea, bool obstructed, int zClass = ZOMBIECLASS_BOOMER)
 {
-    
+    g_bGridValidateCooldown = false;
+
     // Nav area attributes
     int navSpawnAttrs = -1; // skip LOS checks for obscured navmeshes
     float t = GetEngineTime();
@@ -205,9 +207,11 @@ static bool Grid_ValidateCell(int idx, float pos[3], Address navArea, bool obstr
         return false;
     }
 
-    if (cell_cooldown(g_GridCellIndices[idx]))
+    int cooldownContext;
+    if (cell_cooldown(g_GridCellIndices[idx], cooldownContext))
     {
-       g_iGridValidateContext = SPAWNER_SIGHT;
+       g_iGridValidateContext = cooldownContext;
+       g_bGridValidateCooldown = true;
        return false;
     }
     
@@ -473,9 +477,9 @@ Action Grid_TimerUpdate(Handle timer, int userid)
                     GridRenderer_HideAll(client);
                     break;
                 }
-                else set_cell_cooldown(cell);
+                else if (!g_bGridValidateCooldown) set_cell_cooldown(cell, g_iGridValidateContext);
             }
-            else set_cell_cooldown(cell);
+            else if (!g_bGridValidateCooldown) set_cell_cooldown(cell, g_iGridValidateContext);
         }
         
     }

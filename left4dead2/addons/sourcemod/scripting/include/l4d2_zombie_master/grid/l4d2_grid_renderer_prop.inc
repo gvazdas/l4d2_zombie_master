@@ -1,18 +1,6 @@
 /**
  * Grid Renderer Backend: prop_dynamic + Custom Model
- * Spawns flat colored quad models at cell positions
- *
- * Uses a custom flat quad .mdl (32x32 units) positioned at each cell.
- * Renders as FILLED SOLID colored rectangles instead of wireframe outlines.
- * Per-client visibility via SDKHook_SetTransmit.
- *
- *
- * Model files required in addons/sourcemod/:
- *   models/grid/grid_cell.mdl
- *   models/grid/grid_cell.vvd
- *   models/grid/grid_cell.dx90.vtx
- *   materials/models/grid/grid_cell.vmt
- *   materials/models/grid/grid_cell.vtf
+ * Spawns colored quad models at cell positions
  */
 
 #if defined _l4d2_grid_renderer_prop_included
@@ -28,7 +16,10 @@
 // ============================================================================
 
 #define GRIDRENDERERPROP_MAX_ENTITIES 25
-#define GRIDRENDERERPROP_MODEL "models/grid/grid_cell.mdl"
+#define GRIDRENDERERPROP_MODEL_BASE "models/grid/grid_cell6"
+#define GRIDRENDERERPROP_MODEL      GRIDRENDERERPROP_MODEL_BASE ... ".mdl"
+#define GRIDRENDERERPROP_MODEL_VVD  GRIDRENDERERPROP_MODEL_BASE ... ".vvd"
+#define GRIDRENDERERPROP_MODEL_VTX  GRIDRENDERERPROP_MODEL_BASE ... ".dx90.vtx"
 
 // Render modes
 #define RENDER_NORMAL     0
@@ -42,6 +33,33 @@
 #define EF_NOSHADOW  16  // Don't cast shadows
 #define EF_NODRAW    32  // Don't render
 
+// order must match the $texturegroup skin family list in tools/models/grid/grid_cell6.qc
+#define GRIDSKIN_VALID        0
+#define GRIDSKIN_BLOCKED      1
+#define GRIDSKIN_CONDITIONAL  2
+#define GRIDSKIN_TARGET       3
+#define GRIDSKIN_RING         4
+
+// X-ray twins. Selected when a cell is underwater or out of the ZM's direct sight, so it
+// draws through geometry
+#define GRIDSKIN_VALID_XRAY       5
+#define GRIDSKIN_BLOCKED_XRAY     6
+#define GRIDSKIN_CONDITIONAL_XRAY 7
+#define GRIDSKIN_SEEN             8
+#define GRIDSKIN_NEAR             9
+#define GRIDSKIN_SEEN_XRAY        10
+#define GRIDSKIN_NEAR_XRAY        11
+
+static const char GRIDSKIN_NAMES[][24] = {
+	"valid", "blocked2", "conditional", "target", "ring",
+	"valid_xray", "blocked2_xray", "conditional_xray",
+	"seen", "near", "seen_xray", "near_xray"
+};
+
+#if GRIDRENDERER_MAX_CELLS > PVSFORCE_MAX_ORIGINS
+ #error PVSFORCE_MAX_ORIGINS must be at least GRIDRENDERER_MAX_CELLS
+#endif
+
 // ============================================================================
 // Data Structures
 // ============================================================================
@@ -50,9 +68,21 @@ enum struct PropPool
 {
 	int entities[GRIDRENDERERPROP_MAX_ENTITIES];      // Entity refs
 	int assignedCell[GRIDRENDERERPROP_MAX_ENTITIES];  // Cell index assigned to each entity (-1 = free)
+	int lastColor[GRIDRENDERERPROP_MAX_ENTITIES];     // Last packed RGBA written
+	int lastSkin[GRIDRENDERERPROP_MAX_ENTITIES];      // Last m_nSkin written
+	bool glowOn[GRIDRENDERERPROP_MAX_ENTITIES];       // Last glow state written
+	int glowRgb[GRIDRENDERERPROP_MAX_ENTITIES];       // Last glow colour written
+	bool hidden[GRIDRENDERERPROP_MAX_ENTITIES];       // Currently EF_NODRAW'd by us
 	int activeCount;                                  // Currently visible entities
 	int totalAllocated;                               // Total allocated in pool
 	bool initialized;                                 // Pool is ready
+
+	int focusEntity;         // Entity ref, or INVALID_ENT_REFERENCE
+	int focusLastColor;      // Last packed RGBA written
+	int focusLastSkin;       // Last m_nSkin written
+	float focusLastScale;    // Last m_flModelScale written
+	bool focusHidden;
+	bool focusCreateFailed;
 }
 
 // ============================================================================
@@ -63,6 +93,7 @@ static PropPool g_PropPool[MAXPLAYERS+1];
 static int g_Prop_OwnerClient[2049];   // Entity index -> owner client
 static bool g_PropModelPrecached = false;
 static bool g_PropAlphaFade = true;    // Distance-based alpha fade
+static bool g_PropClusterOverflowWarned = false;
 
 // ============================================================================
 // Backend Interface
@@ -78,17 +109,23 @@ stock void GridRendererProp_SetAlphaFade(bool enabled)
 
 stock void GridRendererProp_Init()
 {
+	for (int i = 1; i <= MaxClients; i++)
+		GridRendererProp_DestroyPool(i);
+
 	for (int i = 0; i <= MaxClients; i++)
 	{
 		g_PropPool[i].initialized = false;
 		g_PropPool[i].totalAllocated = 0;
 		g_PropPool[i].activeCount = 0;
 		for (int j = 0; j < GRIDRENDERERPROP_MAX_ENTITIES; j++)
-			g_PropPool[i].assignedCell[j] = -1;
+			GridRendererProp_ResetSlot(i, j);
+		GridRendererProp_ResetFocus(i);
 	}
 
 	for (int i = 0; i < sizeof(g_Prop_OwnerClient); i++)
 		g_Prop_OwnerClient[i] = 0;
+
+	g_PropClusterOverflowWarned = false;
 
 	// Precache model and add to downloads table
 	if (GridRendererProp_PrecacheAssets())
@@ -156,11 +193,16 @@ stock int GridRendererProp_DrawCells(int client,
 	if (count > totalEnts)
 		count = totalEnts;
 
+	int clusterKeys[PVSFORCE_MAX_ORIGINS];
+	int clusterEnts[PVSFORCE_MAX_ORIGINS];
+	int clusterSetCount = 0;
+
 	// --- Phase 1: Classify entities as "kept" or "freed" ---
 	// An entity is "kept" if its assignedCell matches one of the new cellIndices.
 	// We also record which cellIndices[] slot it matched (for color lookup).
 	bool entityKept[GRIDRENDERERPROP_MAX_ENTITIES];
 	int entityDataIdx[GRIDRENDERERPROP_MAX_ENTITIES]; // index into cellIndices/cellValid for kept entities
+	bool justAssigned[GRIDRENDERERPROP_MAX_ENTITIES];
 	bool cellHandled[GRIDRENDERER_MAX_CELLS];         // which cellIndices slots already have an entity
 
 	for (int i = 0; i < GRIDRENDERER_MAX_CELLS; i++)
@@ -170,6 +212,7 @@ stock int GridRendererProp_DrawCells(int client,
 	{
 		entityKept[e] = false;
 		entityDataIdx[e] = -1;
+		justAssigned[e] = false;
 
 		int ac = g_PropPool[client].assignedCell[e];
 		if (ac < 0)
@@ -195,10 +238,37 @@ stock int GridRendererProp_DrawCells(int client,
 		}
 	}
 
+	int drawn = 0;
+
+	bool targetCollected = false;
+	if (closestValidIdx >= 0 && cellHandled[closestValidIdx])
+	{
+		for (int e = 0; e < totalEnts; e++)
+		{
+			if (entityDataIdx[e] != closestValidIdx)
+				continue;
+
+			int targetAlpha = GridRendererProp_ComputeAlpha(closestValidIdx, count, true, g_GridCellContext[closestValidIdx]);
+			GridRendererProp_CollectClusterOrigin(cellIndices[closestValidIdx], targetAlpha,
+				EntRefToEntIndex(g_PropPool[client].entities[e]), hasOverride[closestValidIdx],
+				clusterKeys, clusterEnts, clusterSetCount);
+
+			targetCollected = true;
+			break;
+		}
+	}
+
 	// --- Phase 2: Assign freed entities to new (unmatched) cells ---
 	int freeIdx = 0;
-	for (int i = 0; i < count; i++)
+	for (int n = 0; n < count; n++)
 	{
+		int i = n;
+		if (closestValidIdx >= 0 && closestValidIdx < count && !targetCollected)
+		{
+			if (n == 0) i = closestValidIdx;
+			else if (n == closestValidIdx) i = 0;
+		}
+
 		if (cellHandled[i])
 			continue;  // Already has a kept entity
 
@@ -244,36 +314,47 @@ stock int GridRendererProp_DrawCells(int client,
 
 			int color[4];
 			bool isClosest = (i == closestValidIdx);
-			GridRenderer_ResolveColor(cellValid[i], isClosest, color, g_GridCellContext[i]);
+			int cellClass = GridRenderer_ClassifyCell(cellValid[i], g_GridCellContext[i]);
+			GridRenderer_ResolveColor(cellClass, isClosest, color);
 			color[3] = GridRendererProp_ComputeAlpha(i, count, isClosest, g_GridCellContext[i]);
 
-			bool glowThis = (isClosest && cellValid[i] && g_iSpawnerMode==2)
-			             || GridLib_IsCellUnderwater(cellIndices[i]);
+			bool isTarget = isClosest && cellValid[i] && g_iSpawnerMode==2;
+			bool underwater = GridLib_IsCellUnderwater(cellIndices[i]);
+			int skin = GridRendererProp_ResolveStateSkin(cellClass, isTarget);
 
 			float angles[3];
 			GridRendererProp_NormalToAngles(normal, angles);
-			GridRendererProp_UpdateEntity(client, freeIdx, position, angles, color, glowThis);
+			GridRendererProp_UpdateEntity(client, freeIdx, position, angles, color, skin, isTarget, underwater);
+
+			GridRendererProp_CollectClusterOrigin(cellIndices[i], color[3],
+				EntRefToEntIndex(g_PropPool[client].entities[freeIdx]), hasOverride[i],
+				clusterKeys, clusterEnts, clusterSetCount);
+
+			drawn++;
+
+			justAssigned[freeIdx] = true;
 		}
 
 		freeIdx++;
 	}
 
 	// --- Phase 3: Update kept entities (color + teleport if override changed) ---
-	int drawn = 0;
 	for (int e = 0; e < totalEnts; e++)
 	{
 		int dataIdx = entityDataIdx[e];
-		if (dataIdx < 0)
-			continue;  // Unused - will be hidden in Phase 4
+		if (dataIdx < 0 || justAssigned[e])
+			continue;  // Unused (hidden in Phase 4), or already drawn by Phase 2 above
 
 		// Update color (and ensure visible)
 		int color[4];
 		bool isClosest = (dataIdx == closestValidIdx);
-		GridRenderer_ResolveColor(cellValid[dataIdx], isClosest, color, g_GridCellContext[dataIdx]);
+		int cellClass = GridRenderer_ClassifyCell(cellValid[dataIdx], g_GridCellContext[dataIdx]);
+		GridRenderer_ResolveColor(cellClass, isClosest, color);
 		color[3] = GridRendererProp_ComputeAlpha(dataIdx, count, isClosest, g_GridCellContext[dataIdx]);
 
-		bool glowThis = (isClosest && cellValid[dataIdx] && g_iSpawnerMode==2)
-		             || GridLib_IsCellUnderwater(cellIndices[dataIdx]);
+		bool isTarget = isClosest && cellValid[dataIdx] && g_iSpawnerMode==2;
+		bool underwater = GridLib_IsCellUnderwater(cellIndices[dataIdx]);
+		int skin = GridRendererProp_ResolveStateSkin(cellClass, isTarget);
 
 		// If this cell has a rescue position override, teleport to the adjusted position
 		if (hasOverride[dataIdx])
@@ -302,17 +383,25 @@ stock int GridRendererProp_DrawCells(int client,
 
 				float angles[3];
 				GridRendererProp_NormalToAngles(normal, angles);
-				GridRendererProp_UpdateEntity(client, e, position, angles, color, glowThis);
+				GridRendererProp_UpdateEntity(client, e, position, angles, color, skin, isTarget, underwater);
 			}
 			else
 			{
-				GridRendererProp_UpdateEntityColor(client, e, color, glowThis);
+				GridRendererProp_UpdateEntityColor(client, e, color, skin, isTarget, underwater);
 			}
 		}
 		else
 		{
-			GridRendererProp_UpdateEntityColor(client, e, color, glowThis);
+			GridRendererProp_UpdateEntityColor(client, e, color, skin, isTarget, underwater);
 		}
+
+		if (dataIdx != closestValidIdx || !targetCollected)
+		{
+			GridRendererProp_CollectClusterOrigin(cellIndices[dataIdx], color[3],
+				EntRefToEntIndex(g_PropPool[client].entities[e]), hasOverride[dataIdx],
+				clusterKeys, clusterEnts, clusterSetCount);
+		}
+
 		drawn++;
 	}
 
@@ -323,21 +412,44 @@ stock int GridRendererProp_DrawCells(int client,
 			GridRendererProp_HideEntity(client, e);
 	}
 
-	// Inject only the highlighted closest-valid cell through walls (the spawn target).
-    // TODO: should be center cell probably, since what if all cells are invalid
-	int primaryEnt = -1;
-	if (closestValidIdx >= 0)
+	// --- Phase 5: Position the focus marker on the target cell ---
+	if (g_iSpawnerMode != 2)
 	{
-		for (int e = 0; e < totalEnts; e++)
+		GridRendererProp_HideFocusMarker(client);
+	}
+	else
+	{
+		int focusTargetEnt = INVALID_ENT_REFERENCE;
+		if (closestValidIdx >= 0)
 		{
-			if (entityDataIdx[e] == closestValidIdx)
+			for (int e = 0; e < totalEnts; e++)
 			{
-				primaryEnt = EntRefToEntIndex(g_PropPool[client].entities[e]);
-				break;
+				if (entityDataIdx[e] == closestValidIdx)
+				{
+					focusTargetEnt = EntRefToEntIndex(g_PropPool[client].entities[e]);
+					break;
+				}
 			}
 		}
+
+		if (focusTargetEnt == INVALID_ENT_REFERENCE || !IsValidEntity(focusTargetEnt))
+		{
+			GridRendererProp_HideFocusMarker(client);
+		}
+		else if (!GridRendererProp_EnsureFocusMarker(client))
+		{
+			GridRendererProp_HideFocusMarker(client);
+		}
+		else
+		{
+			float focusPos[3], focusAng[3];
+			GetEntPropVector(focusTargetEnt, Prop_Send, "m_vecOrigin", focusPos);
+			GetEntPropVector(focusTargetEnt, Prop_Send, "m_angRotation", focusAng);
+			GridRendererProp_UpdateFocusMarker(client, focusPos, focusAng, GridRendererProp_ResolveHullScale());
+		}
 	}
-	PvsForce_SetPrimary(client, primaryEnt);
+
+	PvsForce_SetOrigins(client, clusterEnts, clusterSetCount);
 
 	g_PropPool[client].activeCount = drawn;
 	return drawn;
@@ -359,19 +471,125 @@ stock int GridRendererProp_DrawCells(int client,
 static int GridRendererProp_ComputeAlpha(int dataIdx, int count, bool isClosest, int state = SPAWNER_OK)
 {
 	if (state==SPAWNER_BUDGET) return 0;
-	if (isClosest && g_iSpawnerMode==2) return 220;
-	if (!g_PropAlphaFade) return 50;
 
-	// Fade from ALPHA_CENTER (nearest) to ALPHA_EDGE (furthest)
-	static const int ALPHA_CENTER = 150;
-	static const int ALPHA_EDGE = 35;
+	static const int ALPHA_CENTER = 230;
+	static const int ALPHA_EDGE = 66;
 
-	if (count <= 1)
-		return ALPHA_CENTER;
+	int alpha;
+	if (isClosest && g_iSpawnerMode==2)
+		alpha = 255;
+	else if (!g_PropAlphaFade)
+		alpha = 95;
+	else if (count <= 1)
+		alpha = ALPHA_CENTER;
+	else
+	{
+		// Linear interpolation: t goes from 0.0 (center) to 1.0 (edge)
+		float t = float(dataIdx) / float(count - 1);
+		alpha = RoundToNearest(float(ALPHA_CENTER) + t * float(ALPHA_EDGE - ALPHA_CENTER));
+	}
 
-	// Linear interpolation: t goes from 0.0 (center) to 1.0 (edge)
-	float t = float(dataIdx) / float(count - 1);
-	return RoundToNearest(float(ALPHA_CENTER) + t * float(ALPHA_EDGE - ALPHA_CENTER));
+	return alpha;
+}
+
+// ============================================================================
+// Skin Helpers
+// ============================================================================
+
+/**
+ * Resolve a cell's base skin from its class.
+ *
+ * @param cellClass    GRIDCELL_CLASS_* from GridRenderer_ClassifyCell
+ * @param isTarget     Closest valid cell under Spawner Mode 2 (the ZM's active pick)
+ * @return             Resolved GRIDSKIN_* constant
+ */
+static int GridRendererProp_ResolveStateSkin(int cellClass, bool isTarget)
+{
+	if (isTarget)
+		return GRIDSKIN_TARGET;
+
+	switch (cellClass)
+	{
+		case GRIDCELL_CLASS_VALID: return GRIDSKIN_VALID;
+		case GRIDCELL_CLASS_SEEN:  return GRIDSKIN_SEEN;
+		case GRIDCELL_CLASS_NEAR:  return GRIDSKIN_NEAR;
+		case GRIDCELL_CLASS_DEAD:  return GRIDSKIN_BLOCKED;
+	}
+
+	return GRIDSKIN_CONDITIONAL;
+}
+
+/**
+ * Map a base state skin to its x-ray twin.
+ *
+ * @param baseSkin    GRIDSKIN_* returned by GridRendererProp_ResolveStateSkin
+ * @return            The base skin's x-ray twin, or the base skin unchanged if it has none
+ */
+static int GridRendererProp_ResolveOccludedSkin(int baseSkin)
+{
+	switch (baseSkin)
+	{
+		case GRIDSKIN_VALID:       return GRIDSKIN_VALID_XRAY;
+		case GRIDSKIN_BLOCKED:     return GRIDSKIN_BLOCKED_XRAY;
+		case GRIDSKIN_CONDITIONAL: return GRIDSKIN_CONDITIONAL_XRAY;
+		case GRIDSKIN_SEEN:        return GRIDSKIN_SEEN_XRAY;
+		case GRIDSKIN_NEAR:        return GRIDSKIN_NEAR_XRAY;
+	}
+
+	// GRIDSKIN_TARGET and GRIDSKIN_RING already carry $ignorez and need no twin.
+	// Returning the base keeps this safe if a state is added later without XRAY variant.
+	return baseSkin;
+}
+
+static void GridRendererProp_CollectClusterOrigin(int gridCellIdx, int alpha, int entity, bool skipOverrideDedup,
+                                                    int clusterKeys[PVSFORCE_MAX_ORIGINS],
+                                                    int clusterEnts[PVSFORCE_MAX_ORIGINS],
+                                                    int &setCount)
+{
+	if (alpha == 0 || entity <= 0 || !IsValidEntity(entity))
+		return;
+
+	if (skipOverrideDedup)
+	{
+		if (setCount >= PVSFORCE_MAX_ORIGINS)
+		{
+			if (!g_PropClusterOverflowWarned)
+			{
+				LogError("[GridRenderer Prop] PVS cluster set hit its bound (%d); some drawn cells will not transmit through walls this frame.", PVSFORCE_MAX_ORIGINS);
+				g_PropClusterOverflowWarned = true;
+			}
+			return;
+		}
+		clusterKeys[setCount] = -2 - setCount;
+		clusterEnts[setCount] = entity;
+		setCount++;
+		return;
+	}
+
+	int cluster = GridLib_GetCellCluster(gridCellIdx);
+
+	if (cluster == -1)
+		return;
+
+	for (int j = 0; j < setCount; j++)
+	{
+		if (clusterKeys[j] == cluster)
+			return; // Cluster already has a representative origin
+	}
+
+	if (setCount >= PVSFORCE_MAX_ORIGINS)
+	{
+		if (!g_PropClusterOverflowWarned)
+		{
+			LogError("[GridRenderer Prop] PVS cluster set hit its bound (%d); some drawn cells will not transmit through walls this frame.", PVSFORCE_MAX_ORIGINS);
+			g_PropClusterOverflowWarned = true;
+		}
+		return;
+	}
+
+	clusterKeys[setCount] = cluster;
+	clusterEnts[setCount] = entity;
+	setCount++;
 }
 
 // ============================================================================
@@ -394,14 +612,22 @@ stock bool GridRendererProp_PrecacheAssets()
 
 	PrecacheModel(GRIDRENDERERPROP_MODEL, true);
 
-	// Add model files to downloads table
+	// Add model files, and every skin family's material, to the downloads table
 	if (FindConVar("sv_allowdownload").BoolValue)
 	{
-		AddFileToDownloadsTable("models/grid/grid_cell.mdl");
-		AddFileToDownloadsTable("models/grid/grid_cell.vvd");
-		AddFileToDownloadsTable("models/grid/grid_cell.dx90.vtx");
-		AddFileToDownloadsTable("materials/models/grid/grid_cell.vmt");
-		AddFileToDownloadsTable("materials/models/grid/grid_cell.vtf");
+		AddFileToDownloadsTable(GRIDRENDERERPROP_MODEL);
+		AddFileToDownloadsTable(GRIDRENDERERPROP_MODEL_VVD);
+		AddFileToDownloadsTable(GRIDRENDERERPROP_MODEL_VTX);
+
+		char path[PLATFORM_MAX_PATH];
+		for (int i = 0; i < sizeof(GRIDSKIN_NAMES); i++)
+		{
+			FormatEx(path, sizeof(path), "materials/models/grid/grid_cell_%s.vmt", GRIDSKIN_NAMES[i]);
+			AddFileToDownloadsTable(path);
+
+			FormatEx(path, sizeof(path), "materials/models/grid/grid_cell_%s.vtf", GRIDSKIN_NAMES[i]);
+			AddFileToDownloadsTable(path);
+		}
 	}
 
 	return true;
@@ -410,6 +636,26 @@ stock bool GridRendererProp_PrecacheAssets()
 // ============================================================================
 // Pool Management
 // ============================================================================
+
+static void GridRendererProp_ResetSlot(int client, int idx)
+{
+	g_PropPool[client].assignedCell[idx] = -1;
+	g_PropPool[client].lastColor[idx] = 0;
+	g_PropPool[client].lastSkin[idx] = -1;
+	g_PropPool[client].glowOn[idx] = false;
+	g_PropPool[client].glowRgb[idx] = 0;
+	g_PropPool[client].hidden[idx] = true;
+}
+
+static void GridRendererProp_ResetFocus(int client)
+{
+	g_PropPool[client].focusEntity = INVALID_ENT_REFERENCE;
+	g_PropPool[client].focusLastColor = 0;
+	g_PropPool[client].focusLastSkin = -1;
+	g_PropPool[client].focusLastScale = -1.0;
+	g_PropPool[client].focusHidden = true;
+	g_PropPool[client].focusCreateFailed = false;
+}
 
 /**
  * Create the entity pool for a client
@@ -445,7 +691,9 @@ static void GridRendererProp_CreatePool(int client)
 		// Start hidden, no shadows, no interpolation
 		int effects = GetEntProp(ent, Prop_Send, "m_fEffects");
 		SetEntProp(ent, Prop_Send, "m_fEffects", effects | EF_NODRAW | EF_NOSHADOW | EF_NOINTERP);
-		
+
+		GridRendererProp_ResetSlot(client, i);
+
 		// Set up transmit hook for per-client visibility
 		g_Prop_OwnerClient[ent] = client;
 		SDKHook(ent, SDKHook_SetTransmit, GridRendererProp_OnSetTransmit);
@@ -459,11 +707,14 @@ static void GridRendererProp_CreatePool(int client)
 
 	}
 
+	for (int i = created; i < GRIDRENDERERPROP_MAX_ENTITIES; i++)
+		GridRendererProp_ResetSlot(client, i);
+
 	g_PropPool[client].totalAllocated = created;
 	g_PropPool[client].activeCount = 0;
-	for (int i = 0; i < GRIDRENDERERPROP_MAX_ENTITIES; i++)
-		g_PropPool[client].assignedCell[i] = -1;
 	g_PropPool[client].initialized = true;
+
+	GridRendererProp_ResetFocus(client);
 
 	if (DEBUG) LogMessage("[GridRenderer Prop] Created pool for client %d: %d entities", client, created);
 }
@@ -491,7 +742,18 @@ static void GridRendererProp_DestroyPool(int client)
 			g_Prop_OwnerClient[ent] = 0;
 			RemoveEntity(ent);
 		}
+
+		GridRendererProp_ResetSlot(client, i);
 	}
+
+	PvsForce_UnregisterRef(g_PropPool[client].focusEntity);
+	int focus = EntRefToEntIndex(g_PropPool[client].focusEntity);
+	if (focus != INVALID_ENT_REFERENCE && IsValidEntity(focus))
+	{
+		g_Prop_OwnerClient[focus] = 0;
+		RemoveEntity(focus);
+	}
+	GridRendererProp_ResetFocus(client);
 
 	g_PropPool[client].totalAllocated = 0;
 	g_PropPool[client].activeCount = 0;
@@ -502,65 +764,129 @@ static void GridRendererProp_DestroyPool(int client)
 // Entity Updates
 // ============================================================================
 
+static bool GridRendererProp_ColorChanged(int client, int idx, const int color[4])
+{
+	int packed = (color[0] << 24) | (color[1] << 16) | (color[2] << 8) | color[3];
+	if (g_PropPool[client].lastColor[idx] == packed)
+		return false;
+
+	g_PropPool[client].lastColor[idx] = packed;
+	return true;
+}
+
+static bool GridRendererProp_SkinChanged(int client, int idx, int skin)
+{
+	if (g_PropPool[client].lastSkin[idx] == skin)
+		return false;
+
+	g_PropPool[client].lastSkin[idx] = skin;
+	return true;
+}
+
 /**
- * Update a prop entity's position, angle, color, and glow state
+ * Decide whether a cell glows, and swap its skin to the x-ray twin when it is hidden.
+ *
+ * A cell counts as hidden when it is underwater or when the ZM has no direct line to it.
+ *
+ * @param isTarget    Cell is the ZM's active pick
+ * @param underwater  GridLib_IsCellUnderwater for this cell
+ * @param position    Cell world position, used for the ZM sight trace
+ * @param alpha       Resolved alpha; 0 means the cell is not drawn at all
+ * @param skin        In/out: swapped to the x-ray twin when the cell is hidden
+ * @return            Whether the cell should glow
+ */
+static bool GridRendererProp_ShouldGlow(bool isTarget, bool underwater, const float position[3], int alpha, int &skin)
+{
+	if (alpha == 0)
+		return false;
+
+	if (isTarget)
+		return true;
+
+	bool hidden = underwater || !can_ZM_see(position, 1.0);
+	if (hidden)
+		skin = GridRendererProp_ResolveOccludedSkin(skin);
+
+	return hidden;
+}
+
+/**
+ * Update a prop entity's position, angle, color, skin, and glow state
  */
 static void GridRendererProp_UpdateEntity(int client, int idx,
                                            const float position[3],
                                            const float angles[3],
                                            const int color[4],
-                                           bool glow)
+                                           int skin,
+                                           bool isTarget,
+                                           bool underwater)
 {
 	int ent = EntRefToEntIndex(g_PropPool[client].entities[idx]);
 	if (ent == INVALID_ENT_REFERENCE || !IsValidEntity(ent))
 		return;
 
 	TeleportEntity(ent, position, angles, NULL_VECTOR);
-	SetEntityRenderColor(ent, color[0], color[1], color[2], color[3]);
+	if (GridRendererProp_ColorChanged(client, idx, color))
+		SetEntityRenderColor(ent, color[0], color[1], color[2], color[3]);
 
 	int effects = GetEntProp(ent, Prop_Send, "m_fEffects") & ~EF_NODRAW;
 	if (g_iSpawnerMode<2) effects = effects | EF_NOSHADOW;
 	else effects = effects | EF_NOSHADOW | EF_NOINTERP;
 	SetEntProp(ent, Prop_Send, "m_fEffects", effects);
+	g_PropPool[client].hidden[idx] = false;
 
-	if (!glow) glow = !can_ZM_see(position,1.0);
-	GridRendererProp_SetGlow(ent, glow, color);
+	bool glow = GridRendererProp_ShouldGlow(isTarget, underwater, position, color[3], skin);
+	if (GridRendererProp_SkinChanged(client, idx, skin))
+		SetEntProp(ent, Prop_Send, "m_nSkin", skin);
+
+	GridRendererProp_SetGlow(client, idx, glow, color);
 }
 
 /**
- * Update a prop entity's color and glow only (no teleport) and ensure visible
+ * Update a prop entity's color, skin, and glow only (no teleport) and ensure visible
  */
-static void GridRendererProp_UpdateEntityColor(int client, int idx, const int color[4], bool glow)
+static void GridRendererProp_UpdateEntityColor(int client, int idx, const int color[4], int skin, bool isTarget, bool underwater)
 {
 	int ent = EntRefToEntIndex(g_PropPool[client].entities[idx]);
 	if (ent == INVALID_ENT_REFERENCE || !IsValidEntity(ent))
 		return;
 
-	SetEntityRenderColor(ent, color[0], color[1], color[2], color[3]);
+	if (GridRendererProp_ColorChanged(client, idx, color))
+		SetEntityRenderColor(ent, color[0], color[1], color[2], color[3]);
 
 	int effects = GetEntProp(ent, Prop_Send, "m_fEffects") & ~EF_NODRAW;
     if (g_iSpawnerMode<2) effects = effects | EF_NOSHADOW;
     else effects = effects | EF_NOSHADOW | EF_NOINTERP;
 	SetEntProp(ent, Prop_Send, "m_fEffects", effects);
-	
-	if (!glow) // Deus Ex I never asked for this meme
-	{
-		static float position[3];
-		GetEntPropVector(ent,Prop_Send,"m_vecOrigin",position);
-		glow = !can_ZM_see(position,1.0);
-	}
-	GridRendererProp_SetGlow(ent, glow, color);
+	g_PropPool[client].hidden[idx] = false;
+
+	float position[3];
+	if (!isTarget && !underwater && color[3] != 0)
+		GetEntPropVector(ent, Prop_Send, "m_vecOrigin", position);
+
+	bool glow = GridRendererProp_ShouldGlow(isTarget, underwater, position, color[3], skin);
+	if (GridRendererProp_SkinChanged(client, idx, skin))
+		SetEntProp(ent, Prop_Send, "m_nSkin", skin);
+
+	GridRendererProp_SetGlow(client, idx, glow, color);
 }
 
-/**
- * Toggle glow on/off for a prop entity
- */
-static void GridRendererProp_SetGlow(int ent, bool glow, const int color[4])
+static void GridRendererProp_SetGlow(int client, int idx, bool glow, const int color[4])
 {
+	int rgb = color[0] | (color[1] << 8) | (color[2] << 16);
+
+	if (g_PropPool[client].glowOn[idx] == glow && (!glow || g_PropPool[client].glowRgb[idx] == rgb))
+		return;
+
+	int ent = EntRefToEntIndex(g_PropPool[client].entities[idx]);
+	if (ent == INVALID_ENT_REFERENCE || !IsValidEntity(ent))
+		return;
+
+	g_PropPool[client].glowOn[idx] = glow;
+
 	if (glow)
 	{
-		//int rgb = (color[0] << 16) | (color[1] << 8) | color[2];
-		int rgb = color[0] | (color[1] << 8) | (color[2] << 16);
+		g_PropPool[client].glowRgb[idx] = rgb;
 		SetEntProp(ent, Prop_Send, "m_iGlowType", 3);
 		SetEntProp(ent, Prop_Send, "m_glowColorOverride", rgb);
 		SetEntProp(ent, Prop_Send, "m_nGlowRangeMin", 0);
@@ -574,11 +900,11 @@ static void GridRendererProp_SetGlow(int ent, bool glow, const int color[4])
 	}
 }
 
-/**
- * Hide a prop entity
- */
 static void GridRendererProp_HideEntity(int client, int idx)
 {
+	if (g_PropPool[client].hidden[idx] && !g_PropPool[client].glowOn[idx])
+		return;
+
 	int ent = EntRefToEntIndex(g_PropPool[client].entities[idx]);
 	if (ent != INVALID_ENT_REFERENCE && IsValidEntity(ent))
 	{
@@ -588,12 +914,12 @@ static void GridRendererProp_HideEntity(int client, int idx)
 
 		SetEntProp(ent, Prop_Send, "m_glowColorOverride", 0);
 		AcceptEntityInput(ent, "StopGlowing");
+		g_PropPool[client].hidden[idx] = true;
+		g_PropPool[client].glowOn[idx] = false;
+		g_PropPool[client].glowRgb[idx] = 0;
 	}
 }
 
-/**
- * Hide all prop entities for a client
- */
 void GridRendererProp_HideAll(int client)
 {
 	if (!g_PropPool[client].initialized) return;
@@ -604,6 +930,152 @@ void GridRendererProp_HideAll(int client)
 		GridRendererProp_HideEntity(client, e);
 	}
 	g_PropPool[client].activeCount = 0;
+	GridRendererProp_HideFocusMarker(client);
+}
+
+// ============================================================================
+// Focus Marker
+// ============================================================================
+
+/**
+ * Focus marker analog of GridRendererProp_ColorChanged.
+ */
+static bool GridRendererProp_FocusColorChanged(int client, const int color[4])
+{
+	int packed = (color[0] << 24) | (color[1] << 16) | (color[2] << 8) | color[3];
+	if (g_PropPool[client].focusLastColor == packed)
+		return false;
+
+	g_PropPool[client].focusLastColor = packed;
+	return true;
+}
+
+static bool GridRendererProp_FocusSkinChanged(int client, int skin)
+{
+	if (g_PropPool[client].focusLastSkin == skin)
+		return false;
+
+	g_PropPool[client].focusLastSkin = skin;
+	return true;
+}
+
+static bool GridRendererProp_FocusScaleChanged(int client, float scale)
+{
+	if (g_PropPool[client].focusLastScale == scale)
+		return false;
+
+	g_PropPool[client].focusLastScale = scale;
+	return true;
+}
+
+static float GridRendererProp_ResolveHullScale()
+{
+	int preview = EntRefToEntIndex(entref_preview);
+	if (preview == INVALID_ENT_REFERENCE || !IsValidEntity(preview))
+		return 1.0;
+
+	float mins[3], maxs[3];
+	GetEntPropVector(preview, Prop_Send, "m_vecMins", mins);
+	GetEntPropVector(preview, Prop_Send, "m_vecMaxs", maxs);
+
+	float wideX = maxs[0] - mins[0];
+	float wideY = maxs[1] - mins[1];
+	float width = (wideX > wideY) ? wideX : wideY;
+	if (width <= 0.0)
+		return 1.0;
+
+	return width / GRIDLIB_CELL_SIZE;
+}
+
+static bool GridRendererProp_EnsureFocusMarker(int client)
+{
+	int existing = EntRefToEntIndex(g_PropPool[client].focusEntity);
+	if (existing != INVALID_ENT_REFERENCE && IsValidEntity(existing))
+		return true;
+
+	PvsForce_UnregisterRef(g_PropPool[client].focusEntity);
+
+	int focus = CreateEntityByName("prop_dynamic_override");
+	if (!IsEntitySafe(focus))
+	{
+		if (!g_PropPool[client].focusCreateFailed)
+		{
+			LogError("[GridRenderer Prop] Edict limit reached creating focus marker for client %d", client);
+			g_PropPool[client].focusCreateFailed = true;
+		}
+		return false;
+	}
+
+	DispatchKeyValue(focus, "model", GRIDRENDERERPROP_MODEL);
+	DispatchKeyValue(focus, "solid", "0");
+	DispatchKeyValue(focus, "disableshadows", "1");
+	DispatchKeyValue(focus, "disablereceiveshadows", "1");
+	DispatchKeyValue(focus, "DisableBoneFollowers", "1");
+
+	DispatchSpawn(focus);
+
+	SetEntityRenderMode(focus, view_as<RenderMode>(RENDER_TRANSCOLOR));
+	SetEntityRenderColor(focus, 0, 0, 0, 0);
+
+	int focusEffects = GetEntProp(focus, Prop_Send, "m_fEffects");
+	SetEntProp(focus, Prop_Send, "m_fEffects", focusEffects | EF_NODRAW | EF_NOSHADOW | EF_NOINTERP);
+
+	g_Prop_OwnerClient[focus] = client;
+	SDKHook(focus, SDKHook_SetTransmit, GridRendererProp_OnSetTransmit);
+
+	g_PropPool[client].focusEntity = EntIndexToEntRef(focus);
+
+	PvsForce_Register(focus, client);
+
+	g_PropPool[client].focusLastColor = 0;
+	g_PropPool[client].focusLastSkin = -1;
+	g_PropPool[client].focusLastScale = -1.0;
+	g_PropPool[client].focusHidden = true;
+	g_PropPool[client].focusCreateFailed = false;
+
+	if (DEBUG) LogMessage("[GridRenderer Prop] Lazily created focus marker for client %d", client);
+
+	return true;
+}
+
+static void GridRendererProp_HideFocusMarker(int client)
+{
+	if (g_PropPool[client].focusHidden)
+		return;
+
+	int ent = EntRefToEntIndex(g_PropPool[client].focusEntity);
+	if (ent != INVALID_ENT_REFERENCE && IsValidEntity(ent))
+	{
+		int effects = GetEntProp(ent, Prop_Send, "m_fEffects");
+		SetEntProp(ent, Prop_Send, "m_fEffects", effects | EF_NODRAW | EF_NOSHADOW | EF_NOINTERP);
+		g_PropPool[client].focusHidden = true;
+	}
+}
+
+static void GridRendererProp_UpdateFocusMarker(int client, const float position[3], const float angles[3], float scale)
+{
+	int ent = EntRefToEntIndex(g_PropPool[client].focusEntity);
+	if (ent == INVALID_ENT_REFERENCE || !IsValidEntity(ent))
+		return;
+
+	TeleportEntity(ent, position, angles, NULL_VECTOR);
+
+	if (GridRendererProp_FocusScaleChanged(client, scale))
+		SetEntPropFloat(ent, Prop_Send, "m_flModelScale", scale);
+
+	int color[4] = GRIDRENDERER_COLOR_HIGHLIGHT;
+	if (GridRendererProp_FocusColorChanged(client, color))
+		SetEntityRenderColor(ent, color[0], color[1], color[2], color[3]);
+
+	if (GridRendererProp_FocusSkinChanged(client, GRIDSKIN_RING))
+		SetEntProp(ent, Prop_Send, "m_nSkin", GRIDSKIN_RING);
+
+	if (g_PropPool[client].focusHidden)
+	{
+		int effects = GetEntProp(ent, Prop_Send, "m_fEffects") & ~EF_NODRAW;
+		SetEntProp(ent, Prop_Send, "m_fEffects", effects);
+		g_PropPool[client].focusHidden = false;
+	}
 }
 
 // ============================================================================

@@ -7,6 +7,8 @@
 
 #define PVSFORCE_EF_NODRAW 32
 
+#define PVSFORCE_MAX_ORIGINS 25
+
 static ConVar g_cvPvsForceEnable;
 static DynamicDetour g_ddSetupVisibility;
 static Handle g_hAddOriginToPVS;
@@ -14,7 +16,8 @@ static bool g_bPvsForceAvailable;
 static bool g_bPvsForceHooked;
 static int g_PvsForceCount;
 static ArrayList g_PvsForceEnts[MAXPLAYERS + 1];
-static int g_PvsForcePrimary[MAXPLAYERS + 1];
+static int g_PvsForceOrigins[MAXPLAYERS + 1][PVSFORCE_MAX_ORIGINS]; // entity refs, one per distinct cluster
+static int g_PvsForceOriginCount[MAXPLAYERS + 1];
 
 static ConVar g_cvPvsForceProfile;
 static Handle g_hPvsForceProfileTimer;
@@ -37,7 +40,7 @@ stock void PvsForce_Init()
 	{
 		if (g_PvsForceEnts[i] == null)
 			g_PvsForceEnts[i] = new ArrayList();
-		g_PvsForcePrimary[i] = INVALID_ENT_REFERENCE;
+		g_PvsForceOriginCount[i] = 0;
 	}
 
 	if (g_hPvsForceProfileTimer == null)
@@ -148,12 +151,30 @@ stock void PvsForce_UnregisterRef(int ref)
 	}
 }
 
-stock void PvsForce_SetPrimary(int client, int entity)
+/**
+ * Replace a client's set of PVS-injection origins for this frame.
+ *
+ * `entities` should already be deduped by PVS cluster (one representative
+ * entity per distinct cluster), since AddOriginToPVS widens by the whole
+ * cluster containing an origin. Invalid entities are dropped silently, and
+ * `count` is clamped to PVSFORCE_MAX_ORIGINS as a backstop.
+ */
+stock void PvsForce_SetOrigins(int client, const int entities[PVSFORCE_MAX_ORIGINS], int count)
 {
 	if (client < 1 || client > MaxClients)
 		return;
-	g_PvsForcePrimary[client] = (entity > 0 && IsValidEntity(entity))
-		? EntIndexToEntRef(entity) : INVALID_ENT_REFERENCE;
+
+	if (count > PVSFORCE_MAX_ORIGINS)
+		count = PVSFORCE_MAX_ORIGINS;
+
+	int stored = 0;
+	for (int i = 0; i < count; i++)
+	{
+		int entity = entities[i];
+		if (entity > 0 && IsValidEntity(entity))
+			g_PvsForceOrigins[client][stored++] = EntIndexToEntRef(entity);
+	}
+	g_PvsForceOriginCount[client] = stored;
 }
 
 stock void PvsForce_OnClientDisconnect(int client)
@@ -161,7 +182,7 @@ stock void PvsForce_OnClientDisconnect(int client)
 	if (client < 1 || client > MaxClients)
 		return;
 
-	g_PvsForcePrimary[client] = INVALID_ENT_REFERENCE;
+	g_PvsForceOriginCount[client] = 0;
 
 	if (g_PvsForceEnts[client] == null)
 		return;
@@ -215,23 +236,36 @@ public MRESReturn PvsForce_OnSetupVisibility(Address pThis, DHookParam hParams)
 	if (list == null || list.Length == 0)
 		return MRES_Ignored;
 
-	int ent = EntRefToEntIndex(g_PvsForcePrimary[client]);
-	if (ent == INVALID_ENT_REFERENCE || !IsValidEntity(ent))
-		return MRES_Ignored;
-	if (GetEntProp(ent, Prop_Send, "m_fEffects") & PVSFORCE_EF_NODRAW)
+	int originCount = g_PvsForceOriginCount[client];
+	if (originCount == 0)
 		return MRES_Ignored;
 
 	float t0 = profile ? GetEngineTime() : 0.0;
+	bool didWork = false;
 
-	float origin[3];
-	GetEntPropVector(ent, Prop_Send, "m_vecOrigin", origin);
-	SDKCall(g_hAddOriginToPVS, origin);
+	// One SDKCall per distinct cluster, so this scales with the deduped origin
+	// count, not with how many entities the client has registered.
+	for (int i = 0; i < originCount; i++)
+	{
+		int ent = EntRefToEntIndex(g_PvsForceOrigins[client][i]);
+		if (ent == INVALID_ENT_REFERENCE || !IsValidEntity(ent))
+			continue;
+		if (GetEntProp(ent, Prop_Send, "m_fEffects") & PVSFORCE_EF_NODRAW)
+			continue;
 
-	if (profile)
+		float origin[3];
+		GetEntPropVector(ent, Prop_Send, "m_vecOrigin", origin);
+		SDKCall(g_hAddOriginToPVS, origin);
+
+		didWork = true;
+		if (profile)
+			g_PvsForceProfileInjects++;
+	}
+
+	if (profile && didWork)
 	{
 		g_PvsForceProfileMs += (GetEngineTime() - t0) * 1000.0;
 		g_PvsForceProfileWorkCalls++;
-		g_PvsForceProfileInjects++;
 	}
 	return MRES_Ignored;
 }

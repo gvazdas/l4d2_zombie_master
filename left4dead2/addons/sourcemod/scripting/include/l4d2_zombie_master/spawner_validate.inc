@@ -16,21 +16,28 @@ bool DEBUG_SPAWNER = false;
 // Cell Cooldown - for reducing expensive revalidation
 // ==========================================================================
 
-// Check if cell is in cooldown
-bool cell_cooldown(int cellIdx)
+#define CELLCD_EXPIRY  0
+#define CELLCD_CONTEXT 1
+
+// Check if cell is in cooldown. On true, outContext receives the stored SPAWNER_* state.
+bool cell_cooldown(int cellIdx, int &outContext = 0)
 {
     if (g_fGridCooldown<=0.0 || !g_CellCooldown || g_CellCooldown.Size<=0) return false;
     char cellKey[8];
     FormatEx(cellKey,sizeof(cellKey), "%x", cellIdx);
-    float t_cooldown; // gametime
-    if (!g_CellCooldown.GetValue(cellKey,t_cooldown)) return false;
-    if (t_cooldown>GetGameTime()) return true;
+    any entry[2];
+    if (!g_CellCooldown.GetArray(cellKey,entry,sizeof(entry))) return false;
+    if (view_as<float>(entry[CELLCD_EXPIRY])>GetGameTime())
+    {
+        outContext = entry[CELLCD_CONTEXT];
+        return true;
+    }
     g_CellCooldown.Remove(cellKey);
     return false;
 }
 
 // Set cell cooldown time
-void set_cell_cooldown(int cellIdx, float t = -1.0)
+void set_cell_cooldown(int cellIdx, int context = SPAWNER_SIGHT, float t = -1.0)
 {
     if (t<0.0)
     {
@@ -39,8 +46,10 @@ void set_cell_cooldown(int cellIdx, float t = -1.0)
     }
     char cellKey[8];
     FormatEx(cellKey,sizeof(cellKey), "%x", cellIdx);
-    g_CellCooldown.SetValue(cellKey,t,true);
-    LogMessage("%s %f", cellKey, t);
+    any entry[2];
+    entry[CELLCD_EXPIRY]  = view_as<any>(t);
+    entry[CELLCD_CONTEXT] = context;
+    g_CellCooldown.SetArray(cellKey,entry,sizeof(entry),true);
 }
 
 // Batch PVS state for accelerated visibility checks in GridLib filter callbacks + other survivor data.
