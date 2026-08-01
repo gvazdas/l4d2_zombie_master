@@ -1,0 +1,7 @@
+"UnlitGeneric"
+{
+	"$basetexture"		"models/grid/grid_cell_seen"
+	"$translucent"		"1"
+	"$nofog"			"1"
+	"$model"			"1"
+}

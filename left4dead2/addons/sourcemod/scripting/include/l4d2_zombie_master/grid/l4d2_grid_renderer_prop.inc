@@ -16,7 +16,7 @@
 // ============================================================================
 
 #define GRIDRENDERERPROP_MAX_ENTITIES 25
-#define GRIDRENDERERPROP_MODEL_BASE "models/grid/grid_cell5"
+#define GRIDRENDERERPROP_MODEL_BASE "models/grid/grid_cell6"
 #define GRIDRENDERERPROP_MODEL      GRIDRENDERERPROP_MODEL_BASE ... ".mdl"
 #define GRIDRENDERERPROP_MODEL_VVD  GRIDRENDERERPROP_MODEL_BASE ... ".vvd"
 #define GRIDRENDERERPROP_MODEL_VTX  GRIDRENDERERPROP_MODEL_BASE ... ".dx90.vtx"
@@ -33,32 +33,32 @@
 #define EF_NOSHADOW  16  // Don't cast shadows
 #define EF_NODRAW    32  // Don't render
 
-// order must match the $texturegroup skin family list in the model source
+// order must match the $texturegroup skin family list in tools/models/grid/grid_cell6.qc
 #define GRIDSKIN_VALID        0
 #define GRIDSKIN_BLOCKED      1
 #define GRIDSKIN_CONDITIONAL  2
-#define GRIDSKIN_OCCLUDED     3
-#define GRIDSKIN_TARGET       4
-#define GRIDSKIN_RING         5
-#define GRIDSKIN_WATER        6
-#define GRIDSKIN_LEGACY       7  // its slot still maps a real model, so it cannot be dropped from GRIDSKIN_NAMES
+#define GRIDSKIN_TARGET       3
+#define GRIDSKIN_RING         4
 
-#define GRIDSKIN_VALID_XRAY       8
-#define GRIDSKIN_BLOCKED_XRAY     9
-#define GRIDSKIN_CONDITIONAL_XRAY 10
-#define GRIDSKIN_WATER_XRAY       11
+// X-ray twins. Selected when a cell is underwater or out of the ZM's direct sight, so it
+// draws through geometry
+#define GRIDSKIN_VALID_XRAY       5
+#define GRIDSKIN_BLOCKED_XRAY     6
+#define GRIDSKIN_CONDITIONAL_XRAY 7
+#define GRIDSKIN_SEEN             8
+#define GRIDSKIN_NEAR             9
+#define GRIDSKIN_SEEN_XRAY        10
+#define GRIDSKIN_NEAR_XRAY        11
 
 static const char GRIDSKIN_NAMES[][24] = {
-	"valid", "blocked", "conditional", "occluded",
-	"target", "ring", "water", "legacy",
-	"valid_xray", "blocked_xray", "conditional_xray", "water_xray"
+	"valid", "blocked2", "conditional", "target", "ring",
+	"valid_xray", "blocked2_xray", "conditional_xray",
+	"seen", "near", "seen_xray", "near_xray"
 };
 
 #if GRIDRENDERER_MAX_CELLS > PVSFORCE_MAX_ORIGINS
  #error PVSFORCE_MAX_ORIGINS must be at least GRIDRENDERER_MAX_CELLS
 #endif
-
-#define GRIDSKIN_NAME_WITHOUT_TEXTURE "legacy"
 
 // ============================================================================
 // Data Structures
@@ -314,18 +314,17 @@ stock int GridRendererProp_DrawCells(int client,
 
 			int color[4];
 			bool isClosest = (i == closestValidIdx);
-			GridRenderer_ResolveColor(cellValid[i], isClosest, color, g_GridCellContext[i]);
+			int cellClass = GridRenderer_ClassifyCell(cellValid[i], g_GridCellContext[i], g_GridCellCooldown[i]);
+			GridRenderer_ResolveColor(cellClass, isClosest, color);
 			color[3] = GridRendererProp_ComputeAlpha(i, count, isClosest, g_GridCellContext[i]);
 
 			bool isTarget = isClosest && cellValid[i] && g_iSpawnerMode==2;
 			bool underwater = GridLib_IsCellUnderwater(cellIndices[i]);
-			bool glowThis = isTarget || underwater;
-			bool conditional = g_GridCellContext[i] > SPAWNER_NAV;
-			int skin = GridRendererProp_ResolveStateSkin(cellValid[i], isTarget, underwater, conditional);
+			int skin = GridRendererProp_ResolveStateSkin(cellClass, isTarget);
 
 			float angles[3];
 			GridRendererProp_NormalToAngles(normal, angles);
-			GridRendererProp_UpdateEntity(client, freeIdx, position, angles, color, skin, isTarget, glowThis);
+			GridRendererProp_UpdateEntity(client, freeIdx, position, angles, color, skin, isTarget, underwater);
 
 			GridRendererProp_CollectClusterOrigin(cellIndices[i], color[3],
 				EntRefToEntIndex(g_PropPool[client].entities[freeIdx]), hasOverride[i],
@@ -349,14 +348,13 @@ stock int GridRendererProp_DrawCells(int client,
 		// Update color (and ensure visible)
 		int color[4];
 		bool isClosest = (dataIdx == closestValidIdx);
-		GridRenderer_ResolveColor(cellValid[dataIdx], isClosest, color, g_GridCellContext[dataIdx]);
+		int cellClass = GridRenderer_ClassifyCell(cellValid[dataIdx], g_GridCellContext[dataIdx], g_GridCellCooldown[dataIdx]);
+		GridRenderer_ResolveColor(cellClass, isClosest, color);
 		color[3] = GridRendererProp_ComputeAlpha(dataIdx, count, isClosest, g_GridCellContext[dataIdx]);
 
 		bool isTarget = isClosest && cellValid[dataIdx] && g_iSpawnerMode==2;
 		bool underwater = GridLib_IsCellUnderwater(cellIndices[dataIdx]);
-		bool glowThis = isTarget || underwater;
-		bool conditional = g_GridCellContext[dataIdx] > SPAWNER_NAV;
-		int skin = GridRendererProp_ResolveStateSkin(cellValid[dataIdx], isTarget, underwater, conditional);
+		int skin = GridRendererProp_ResolveStateSkin(cellClass, isTarget);
 
 		// If this cell has a rescue position override, teleport to the adjusted position
 		if (hasOverride[dataIdx])
@@ -385,16 +383,16 @@ stock int GridRendererProp_DrawCells(int client,
 
 				float angles[3];
 				GridRendererProp_NormalToAngles(normal, angles);
-				GridRendererProp_UpdateEntity(client, e, position, angles, color, skin, isTarget, glowThis);
+				GridRendererProp_UpdateEntity(client, e, position, angles, color, skin, isTarget, underwater);
 			}
 			else
 			{
-				GridRendererProp_UpdateEntityColor(client, e, color, skin, isTarget, glowThis);
+				GridRendererProp_UpdateEntityColor(client, e, color, skin, isTarget, underwater);
 			}
 		}
 		else
 		{
-			GridRendererProp_UpdateEntityColor(client, e, color, skin, isTarget, glowThis);
+			GridRendererProp_UpdateEntityColor(client, e, color, skin, isTarget, underwater);
 		}
 
 		if (dataIdx != closestValidIdx || !targetCollected)
@@ -499,33 +497,33 @@ static int GridRendererProp_ComputeAlpha(int dataIdx, int count, bool isClosest,
 // ============================================================================
 
 /**
- * Resolve a cell's skin from state
+ * Resolve a cell's base skin from its class.
  *
- * @param isValid      Cell validation state
+ * @param cellClass    GRIDCELL_CLASS_* from GridRenderer_ClassifyCell
  * @param isTarget     Closest valid cell under Spawner Mode 2 (the ZM's active pick)
- * @param underwater   GridLib_IsCellUnderwater for this cell
- * @param conditional  context > SPAWNER_NAV
- * @return              Resolved GRIDSKIN_* constant
+ * @return             Resolved GRIDSKIN_* constant
  */
-static int GridRendererProp_ResolveStateSkin(bool isValid, bool isTarget, bool underwater, bool conditional)
+static int GridRendererProp_ResolveStateSkin(int cellClass, bool isTarget)
 {
 	if (isTarget)
 		return GRIDSKIN_TARGET;
-	if (underwater)
-		return GRIDSKIN_WATER;
-	if (isValid)
-		return GRIDSKIN_VALID;
-	if (conditional)
-		return GRIDSKIN_CONDITIONAL;
-	return GRIDSKIN_BLOCKED;
+
+	switch (cellClass)
+	{
+		case GRIDCELL_CLASS_VALID: return GRIDSKIN_VALID;
+		case GRIDCELL_CLASS_SEEN:  return GRIDSKIN_SEEN;
+		case GRIDCELL_CLASS_NEAR:  return GRIDSKIN_NEAR;
+		case GRIDCELL_CLASS_DEAD:  return GRIDSKIN_BLOCKED;
+	}
+
+	return GRIDSKIN_CONDITIONAL;
 }
 
 /**
- * Map a base state skin (GridRendererProp_ResolveStateSkin's result) to its
- * x-ray twin
+ * Map a base state skin to its x-ray twin.
  *
  * @param baseSkin    GRIDSKIN_* returned by GridRendererProp_ResolveStateSkin
- * @return            The base skin's x-ray twin, or GRIDSKIN_OCCLUDED if it has none
+ * @return            The base skin's x-ray twin, or the base skin unchanged if it has none
  */
 static int GridRendererProp_ResolveOccludedSkin(int baseSkin)
 {
@@ -534,9 +532,13 @@ static int GridRendererProp_ResolveOccludedSkin(int baseSkin)
 		case GRIDSKIN_VALID:       return GRIDSKIN_VALID_XRAY;
 		case GRIDSKIN_BLOCKED:     return GRIDSKIN_BLOCKED_XRAY;
 		case GRIDSKIN_CONDITIONAL: return GRIDSKIN_CONDITIONAL_XRAY;
-		case GRIDSKIN_WATER:       return GRIDSKIN_WATER_XRAY;
+		case GRIDSKIN_SEEN:        return GRIDSKIN_SEEN_XRAY;
+		case GRIDSKIN_NEAR:        return GRIDSKIN_NEAR_XRAY;
 	}
-	return GRIDSKIN_OCCLUDED;
+
+	// GRIDSKIN_TARGET and GRIDSKIN_RING already carry $ignorez and need no twin.
+	// Returning the base keeps this safe if a state is added later without XRAY variant.
+	return baseSkin;
 }
 
 static void GridRendererProp_CollectClusterOrigin(int gridCellIdx, int alpha, int entity, bool skipOverrideDedup,
@@ -622,9 +624,6 @@ stock bool GridRendererProp_PrecacheAssets()
 		{
 			FormatEx(path, sizeof(path), "materials/models/grid/grid_cell_%s.vmt", GRIDSKIN_NAMES[i]);
 			AddFileToDownloadsTable(path);
-
-			if (StrEqual(GRIDSKIN_NAMES[i], GRIDSKIN_NAME_WITHOUT_TEXTURE))
-				continue;
 
 			FormatEx(path, sizeof(path), "materials/models/grid/grid_cell_%s.vtf", GRIDSKIN_NAMES[i]);
 			AddFileToDownloadsTable(path);
@@ -784,7 +783,19 @@ static bool GridRendererProp_SkinChanged(int client, int idx, int skin)
 	return true;
 }
 
-static bool GridRendererProp_ShouldGlow(bool isTarget, bool forced, const float position[3], int alpha, int &skin)
+/**
+ * Decide whether a cell glows, and swap its skin to the x-ray twin when it is hidden.
+ *
+ * A cell counts as hidden when it is underwater or when the ZM has no direct line to it.
+ *
+ * @param isTarget    Cell is the ZM's active pick
+ * @param underwater  GridLib_IsCellUnderwater for this cell
+ * @param position    Cell world position, used for the ZM sight trace
+ * @param alpha       Resolved alpha; 0 means the cell is not drawn at all
+ * @param skin        In/out: swapped to the x-ray twin when the cell is hidden
+ * @return            Whether the cell should glow
+ */
+static bool GridRendererProp_ShouldGlow(bool isTarget, bool underwater, const float position[3], int alpha, int &skin)
 {
 	if (alpha == 0)
 		return false;
@@ -792,11 +803,11 @@ static bool GridRendererProp_ShouldGlow(bool isTarget, bool forced, const float 
 	if (isTarget)
 		return true;
 
-	bool hidden = !can_ZM_see(position, 1.0);
+	bool hidden = underwater || !can_ZM_see(position, 1.0);
 	if (hidden)
 		skin = GridRendererProp_ResolveOccludedSkin(skin);
 
-	return forced || hidden;
+	return hidden;
 }
 
 /**
@@ -808,7 +819,7 @@ static void GridRendererProp_UpdateEntity(int client, int idx,
                                            const int color[4],
                                            int skin,
                                            bool isTarget,
-                                           bool forced)
+                                           bool underwater)
 {
 	int ent = EntRefToEntIndex(g_PropPool[client].entities[idx]);
 	if (ent == INVALID_ENT_REFERENCE || !IsValidEntity(ent))
@@ -824,7 +835,7 @@ static void GridRendererProp_UpdateEntity(int client, int idx,
 	SetEntProp(ent, Prop_Send, "m_fEffects", effects);
 	g_PropPool[client].hidden[idx] = false;
 
-	bool glow = GridRendererProp_ShouldGlow(isTarget, forced, position, color[3], skin);
+	bool glow = GridRendererProp_ShouldGlow(isTarget, underwater, position, color[3], skin);
 	if (GridRendererProp_SkinChanged(client, idx, skin))
 		SetEntProp(ent, Prop_Send, "m_nSkin", skin);
 
@@ -834,7 +845,7 @@ static void GridRendererProp_UpdateEntity(int client, int idx,
 /**
  * Update a prop entity's color, skin, and glow only (no teleport) and ensure visible
  */
-static void GridRendererProp_UpdateEntityColor(int client, int idx, const int color[4], int skin, bool isTarget, bool forced)
+static void GridRendererProp_UpdateEntityColor(int client, int idx, const int color[4], int skin, bool isTarget, bool underwater)
 {
 	int ent = EntRefToEntIndex(g_PropPool[client].entities[idx]);
 	if (ent == INVALID_ENT_REFERENCE || !IsValidEntity(ent))
@@ -850,10 +861,10 @@ static void GridRendererProp_UpdateEntityColor(int client, int idx, const int co
 	g_PropPool[client].hidden[idx] = false;
 
 	float position[3];
-	if (!isTarget && color[3] != 0)
+	if (!isTarget && !underwater && color[3] != 0)
 		GetEntPropVector(ent, Prop_Send, "m_vecOrigin", position);
 
-	bool glow = GridRendererProp_ShouldGlow(isTarget, forced, position, color[3], skin);
+	bool glow = GridRendererProp_ShouldGlow(isTarget, underwater, position, color[3], skin);
 	if (GridRendererProp_SkinChanged(client, idx, skin))
 		SetEntProp(ent, Prop_Send, "m_nSkin", skin);
 

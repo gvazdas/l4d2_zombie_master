@@ -40,7 +40,6 @@ void set_cell_cooldown(int cellIdx, float t = -1.0)
     char cellKey[8];
     FormatEx(cellKey,sizeof(cellKey), "%x", cellIdx);
     g_CellCooldown.SetValue(cellKey,t,true);
-    LogMessage("%s %f", cellKey, t);
 }
 
 // Batch PVS state for accelerated visibility checks in GridLib filter callbacks + other survivor data.
