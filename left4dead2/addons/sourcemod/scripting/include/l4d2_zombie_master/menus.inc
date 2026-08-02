@@ -1214,6 +1214,34 @@ Action VoteZM(int client, int args)
     return Plugin_Continue;
 }
 
+Action ZM_Votekick(int client, int args)
+{
+    if (!g_bCvarAllow || !IsValidClientZM() || IsVoteInProgress()) return Plugin_Stop;
+    DoVotekickMenu();
+    return Plugin_Continue;
+}
+
+int Handle_VotekickMenu(Menu menu, MenuAction action, int param1, int param2)
+{
+    if (action == MenuAction_End) delete menu;
+    else if (action == MenuAction_VoteEnd)
+    {
+        if (param1 == 0) zm_kick(0,0);
+    }
+    return 0;
+}
+ 
+void DoVotekickMenu()
+{
+    if (IsVoteInProgress()) return;
+    Menu menu = new Menu(Handle_VotekickMenu);
+    menu.SetTitle("Kick ZM?");
+    menu.ExitButton = false;
+    AddMenuItem(menu, "yes", "Yes");
+    AddMenuItem(menu, "no", "No");
+    menu.DisplayVoteToAll(20);
+}
+
 Action ZM_Menu(int client, int args)
 {
     if (!g_bCvarAllow || client!=zm_client || !IsValidClientZM()) return Plugin_Continue;

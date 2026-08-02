@@ -121,15 +121,16 @@ stock bool Trap_CanAfford(int type, bool hint)
 // Accept world/props; ignore the ZM and survivors
 public bool FilterTrapAim(int entity, int mask, int self)
 {
-    if (entity == self) return false;
+    if (entity==self || entity==zm_client) return false;
     if (IsValidClient(entity))
     { 
         if (GetClientTeam(entity)==TEAM_SURVIVOR || !IsPlayerAlive(entity)) return false;
     }
     // ignore prop_dynamic_ornament
-    static char cls[32];
-    GetEntityClassname(entity, cls, sizeof(cls));
-    if (strcmp(cls,"prop_dynamic_ornament",false)==0) return false;
+    //static char cls[32];
+    //GetEntityClassname(entity, cls, sizeof(cls));
+    //if (strcmp(cls,"prop_dynamic_ornament",false)==0) return false;
+    //LogMessage("FilterTrapAim %d %s", entity, cls);
     return true;
 }
 
@@ -146,6 +147,12 @@ stock int Trap_GetAimedEntity(float hitPos[3])
     {
         TR_GetEndPosition(hitPos, trace);
         ent = TR_GetEntityIndex(trace);
+        static char cls[32];
+        if (strncmp(cls,"prop_dynamic",12,false)==0) // prop_dynamic or prop_dynamic_ornament
+        {
+            int parent = GetEntPropEnt(ent,Prop_Data,"m_pParent");
+            if (IsValidEntity(parent)) ent = parent;
+        }
     }
     delete trace;
     return ent;
@@ -215,8 +222,8 @@ static int Trap_SpawnOrnament(int target, int packedColor)
     if (!IsValidEntity(target)) return -1;
     int glow = CreateEntityByName("prop_dynamic_ornament");
     if (!IsEntitySafe(glow)) return -1;
-
-    static char sModelName[64];
+    SET_TRANSMIT_ALWAYS(target);
+    static char sModelName[PLATFORM_MAX_PATH];
     GetEntPropString(target, Prop_Data, "m_ModelName", sModelName, sizeof(sModelName));
     SetEntityModel(glow, sModelName);
     DispatchSpawn(glow);
@@ -234,6 +241,7 @@ static int Trap_SpawnOrnament(int target, int packedColor)
     SetVariantString("!activator");
     AcceptEntityInput(glow, "SetAttached", target);
     DispatchKeyValue(glow, "targetname", "zm_trap_glow");
+    //LogMessage("Trap_SpawnOrnament %d %s", target, sModelName);
     return glow;
 }
 

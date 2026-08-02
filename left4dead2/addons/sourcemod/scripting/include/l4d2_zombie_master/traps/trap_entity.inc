@@ -19,6 +19,13 @@ bool TrapEntity_CanArm(int entity)
     return true;
 }
 
+Action ZM_PanicEntity(int client, int args)
+{
+    if (!g_bCvarAllow || !IsValidClientZM() || zm_client!=client) return Plugin_Continue;
+    TrapEntity_BeginArm();
+    return Plugin_Continue;
+}
+
 void TrapEntity_BeginArm()
 {
     if (!IsValidClientZM()) return;

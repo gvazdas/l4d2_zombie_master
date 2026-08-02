@@ -103,7 +103,8 @@ public Plugin myinfo =
 // 16. Tank music is muted when specials are frozen, unless ZM takes control of a Tank.
 // 17. New cvar: zm_enable_control. Thanks carex53 for the idea.
 // 18. Better ZM flashlight
-// 19. Generic trap
+// 19. Generic trap, zm_panic_object
+// 20. zm_votekick
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
@@ -167,10 +168,12 @@ public void OnPluginStart()
 	RegConsoleCmd("zm_tutorial", ZM_MOTD, "Open console tutorial which explains how to play Zombie Master.");
 	RegConsoleCmd("zm_autocommon_mode", zm_autocommon_mode, "off panic always");
 	RegConsoleCmd("zm_autocommon_max", zm_autocommon_max, "n");
-	RegConsoleCmd("zm_freeze", zm_freeze, "Freeze/unfreeze all specials.");
+	RegConsoleCmd("zm_freeze", zm_freeze, "Freeze/unfreeze all idle Special Infected. SI in active combat will ignore these commands.");
 	RegConsoleCmd("zm_gamemode_menu", ZM_Gamemode_Command, "Admins: select gamemode. Clients: vote for gamemode.");
-    RegConsoleCmd("zm_jumpscare", ZM_Jumpscare, "ZM jumpscare");
+    RegConsoleCmd("zm_jumpscare", ZM_Jumpscare, "ZM Jumpscare");
     RegConsoleCmd("zm_explosion", ZM_Explosion, "ZM Explosion");
+    RegConsoleCmd("zm_panic_object", ZM_PanicEntity, "ZM Panic Trap an Entity");
+    RegConsoleCmd("zm_votekick", ZM_Votekick, "Vote to kick ZM back into survivors. They are banned from playing as ZM for the remaining round.");
     
 	// Commands -- admins only
 	RegAdminCmd("zm_addbank", zm_addbank, ADMFLAG_ROOT,"Add zombux to zombie master bank. Admins only.");
@@ -1129,6 +1132,7 @@ Action zm_new_round(Handle timer = null)
     g_bVomitJar = false;
     g_hVomitJarTimer = null;
     g_iLastZombieClass = -1;
+    zm_kicked_userid = -1;
     
     if (g_bGrid && !GridLib_IsReady())
     {

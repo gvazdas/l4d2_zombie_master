@@ -310,6 +310,7 @@ int entref_preview = INVALID_ENT_REFERENCE; // preview prop_dynamic zombie entit
 float t_last_infected_model; // for zm_preview
 bool g_bLastWitchMoving = true;
 float t_finale_change; // track last finale stage change so they don't last more than 5 minutes each.
+int zm_kicked_userid = -1; // prevent ZM kicked by zm_kick from rejoining
 
 //Handle hTankLeaveStasis; // tank ambush
 
@@ -2695,7 +2696,8 @@ void zm_fake_gamemode()
 
 Action JoinZM_command(int client, int args)
 {
-    if (!IsValidClient(client)) return Plugin_Continue;
+    if (!IsValidClient(client) || IsFakeClient(client)) return Plugin_Continue;
+    if (GetClientUserId(client) == zm_kicked_userid) return Plugin_Continue;
     first_active = true;
     clients_active[client] = true;
     if (!g_bCvarAllow)
@@ -3012,6 +3014,7 @@ Action zm_kick(int client, int args)
     if (!g_bCvarAllow) return Plugin_Continue;
     if (!IsValidClientZM()) return Plugin_Continue;
     if (DEBUG) LogMessage("[zm] zm_kick");
+    zm_kicked_userid = GetClientUserId(zm_client);
     QuitZM(zm_client,false);
     return Plugin_Continue;
 }
@@ -3078,11 +3081,11 @@ stock bool FilterLOS(int entity, int mask, int self = -1)
 	{
     	case 'i':
     	{
-        	if (strncmp(class,"infected",8,false)==0) return false;
+        	if (strcmp(class,"infected",false)==0) return false;
     	}
     	case 'w':
     	{
-        	if (strncmp(class,"witch",5,false)==0) return false;
+        	if (strcmp(class,"witch",false)==0) return false;
     	}
     	case 'e':
     	{
