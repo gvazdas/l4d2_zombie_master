@@ -10,11 +10,12 @@ bool TrapEntity_CanArm(int entity)
 {
     if (!IsValidEntity(entity) || !IsValidEdict(entity)) return false;
     if (IsValidClient(entity) && GetClientTeam(entity)!=TEAM_INFECTED) return false;
-    //static char cls[32];
-    //GetEntityClassname(entity, cls, sizeof(cls));
     static char sModelName[2];
     GetEntPropString(entity, Prop_Data, "m_ModelName", sModelName, sizeof(sModelName));
     if (sModelName[0]==0) return false;
+    //static char cls[32];
+    //GetEntityClassname(entity, cls, sizeof(cls));
+    // ban: prop_dynamic_ornament, entities with parents
     return true;
 }
 
@@ -91,7 +92,7 @@ void TrapEntity_BeginArm()
     }
 
     g_iEntityToTrap[ent] = slot;
-    TrapEntityAttachGlow(slot,ent);
+    CreateTrapGlowZM(slot);
 
     if (g_DHook_AcceptInput) DHookEntity(g_DHook_AcceptInput, true, ent, INVALID_FUNCTION, EntityTrap_AcceptInput);
     SDKHook(ent, SDKHook_TouchPost, EntityTrap_Touch);

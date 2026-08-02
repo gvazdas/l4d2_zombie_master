@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.36j 2026-07-30"
+#define PLUGIN_VERSION 			"0.9.37 2026-08-02"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -103,7 +103,7 @@ public Plugin myinfo =
 // 16. Tank music is muted when specials are frozen, unless ZM takes control of a Tank.
 // 17. New cvar: zm_enable_control. Thanks carex53 for the idea.
 // 18. Better ZM flashlight
-// 19. generic trap_use
+// 19. Generic trap
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
@@ -2591,7 +2591,7 @@ void evtPlayerTeam(Event event, const char[] name, bool dontBroadcast)
     if (DEBUG) LogMessage("[zm] evtPlayerTeam %d", client);
     request_update_glow(client,true,0.0); // Force update glow to reduce glow glitches.
     request_update_glow(client,true); 
-    if (zm_timer==INVALID_HANDLE) zm_update();
+    if (zm_timer==null) zm_update();
     if (zm_client==client) RequestFrame(check_zm_team);
     if (clients_timer==INVALID_HANDLE) clients_timer = CreateTimer(0.1,CountClients);
 }

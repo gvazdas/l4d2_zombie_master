@@ -2767,6 +2767,7 @@ void JoinZM(int client)
     else zm_survivor_model = "";
     ChangeClientTeam(client,TEAM_ZM);
     remove_all_ZM_glows();
+    remove_all_ZM_trap_glows();
     stop_sound(client,true);
     L4D_CleanupPlayerState(client);
     RequestFrame(JoinZM_Post,client);
@@ -2856,6 +2857,9 @@ void JoinZM_Post(int client)
     zm_just_joined = true;
     if (GetClientTeam(client)==TEAM_ZM) RequestFrame(ZM_ClientCleanup); // should clear vignettes, post processing effects, etc.
     //ZM_ClientCleanup(); // should clear vignettes, post processing effects, etc.
+
+    RequestFrame(restore_all_ZM_trap_glows);
+
 }
 
 bool zm_muted = false;

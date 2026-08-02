@@ -118,11 +118,18 @@ stock bool Trap_CanAfford(int type, bool hint)
     return true;
 }
 
-// Accept world/props; ignore the ZM and survivors so the ray lands on the door/car itself.
+// Accept world/props; ignore the ZM and survivors
 public bool FilterTrapAim(int entity, int mask, int self)
 {
     if (entity == self) return false;
-    if (entity > 0 && entity <= MaxClients) return false; // ignore all players
+    if (IsValidClient(entity))
+    { 
+        if (GetClientTeam(entity)==TEAM_SURVIVOR || !IsPlayerAlive(entity)) return false;
+    }
+    // ignore prop_dynamic_ornament
+    static char cls[32];
+    GetEntityClassname(entity, cls, sizeof(cls));
+    if (strcmp(cls,"prop_dynamic_ornament",false)==0) return false;
     return true;
 }
 
@@ -268,6 +275,57 @@ stock void Trap_RemoveGlow(int slot)
     }
     g_Traps[slot].glowSurvRef = INVALID_ENT_REFERENCE;
     g_Traps[slot].glowZMRef = INVALID_ENT_REFERENCE;
+}
+
+// Fire on JoinZM -> create new glow entities for ZM
+stock void restore_all_ZM_trap_glows()
+{
+    if (!IsValidClientZM()) return;
+    for (int i = 0; i < ZM_TRAP_MAX; i++)
+    {
+        int z = g_Traps[i].glowZMRef;
+        if (IsValidEntRef(z))
+        {
+            AcceptEntityInput(z, "StopGlowing");
+            RemoveEntity(z);
+        }
+        g_Traps[i].glowZMRef = INVALID_ENT_REFERENCE;
+        if (g_Traps[i].state == ZM_TRAP_STATE_FREE) continue;
+        CreateTrapGlowZM(i);
+    }
+}
+
+// Create trap glow visible only to ZM.
+stock void CreateTrapGlowZM(const int slot)
+{
+    if (slot<0 || !IsValidClientZM()) return;
+    int entref = g_Traps[slot].entRef;
+    if (!IsValidEntRef(entref)) return;
+    int ent = EntRefToEntIndex(entref);
+    if (!IsValidEntity(ent) || !IsValidEdict(ent)) return;
+    switch (g_Traps[slot].type)
+    {
+        case ZM_TRAP_TYPE_ENTITY: TrapEntityAttachGlow(slot,ent);
+        case ZM_TRAP_TYPE_DOOR:
+        {
+            g_Traps[slot].glowZMRef = Trap_CreateDoorGlowZM(ent);
+        }
+    }
+}
+
+// Fire on QuitZM -> delete glow entities visible only to ZM
+stock void remove_all_ZM_trap_glows()
+{
+    for (int i = 0; i < ZM_TRAP_MAX; i++)
+    {
+        int z = g_Traps[i].glowZMRef;
+        if (IsValidEntRef(z))
+        {
+            AcceptEntityInput(z, "StopGlowing");
+            RemoveEntity(z);
+        }
+        g_Traps[i].glowZMRef = INVALID_ENT_REFERENCE;
+    }
 }
 
 // Resolve a stable effect id string to its enum
