@@ -68,6 +68,7 @@ stock int Trap_TypeCost(int type)
     switch (type)
     {
         case ZM_TRAP_TYPE_EXPLOSION:    return g_hCostExplosion.IntValue;
+        case ZM_TRAP_TYPE_ENTITY:       return 0;
         case ZM_TRAP_TYPE_DOOR:         return g_iCostTrapDoor;
         case ZM_TRAP_TYPE_CAR:          return g_iCostTrapCar;
         case ZM_TRAP_TYPE_TORNADO:      return g_iCostTrapTornado;
@@ -81,6 +82,7 @@ stock int Trap_TypeMax(int type)
     switch (type)
     {
         case ZM_TRAP_TYPE_EXPLOSION: return 1;
+        case ZM_TRAP_TYPE_ENTITY:    return g_iMaxTrapDoor;
         case ZM_TRAP_TYPE_DOOR:      return g_iMaxTrapDoor;
         case ZM_TRAP_TYPE_CAR:       return g_iMaxTrapCar;
         case ZM_TRAP_TYPE_TORNADO:   return g_iMaxTrapTornado;
@@ -108,7 +110,7 @@ stock bool Trap_CanAfford(int type, bool hint)
         if (hint) update_hint("%T", "Trap on cooldown", zm_client);
         return false;
     }
-    if (bank - cost < 0)
+    if (cost>0 && (bank-cost)<0)
     {
         if (hint) update_hint("%T", "Cannot afford", zm_client);
         return false;
@@ -207,7 +209,7 @@ static int Trap_SpawnOrnament(int target, int packedColor)
     int glow = CreateEntityByName("prop_dynamic_ornament");
     if (!IsEntitySafe(glow)) return -1;
 
-    char sModelName[64];
+    static char sModelName[64];
     GetEntPropString(target, Prop_Data, "m_ModelName", sModelName, sizeof(sModelName));
     SetEntityModel(glow, sModelName);
     DispatchSpawn(glow);
@@ -380,6 +382,7 @@ void Trap_Cleanup(int slot)
     // Source-specific teardown (e.g. unhook door output). Dispatch by source type.
     switch (g_Traps[slot].type)
     {
+        case ZM_TRAP_TYPE_ENTITY: TrapEntity_Teardown(slot);
         case ZM_TRAP_TYPE_DOOR: TrapDoor_Teardown(slot);
         case ZM_TRAP_TYPE_CAR:  TrapCar_Teardown(slot);
     }

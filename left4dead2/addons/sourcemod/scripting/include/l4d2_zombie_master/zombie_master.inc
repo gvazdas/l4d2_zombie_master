@@ -41,6 +41,7 @@
 #define ZM_TRAP_TYPE_CAR       1
 #define ZM_TRAP_TYPE_TORNADO   2
 #define ZM_TRAP_TYPE_EXPLOSION 3
+#define ZM_TRAP_TYPE_ENTITY 4
 
 #define ZM_TRAP_FX_PANIC   0
 #define ZM_TRAP_FX_ALARM   1

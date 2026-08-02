@@ -644,29 +644,33 @@ void create_traps_menu()
 
     // Row 0: Explosion
     Format(buffer, sizeof(buffer), "%s %d", "Explosion", g_hCostExplosion.IntValue);
-    if (g_hTraps.IntValue<=1) buffer_add_rawline(buffer);
     AddMenuItem(menu_traps, "item_0", buffer);
+
+    // Row 1: Generic Entity Panic Trap
+    Format(buffer, sizeof(buffer), "%s %d/%d", "Panic Object", Trap_CountActive(ZM_TRAP_TYPE_ENTITY), g_iMaxTrapDoor);
+    if (g_hTraps.IntValue<=1) buffer_add_rawline(buffer);
+    AddMenuItem(menu_traps, "item_1", buffer);
 
     if (g_hTraps.IntValue>1)
     {
-        // Row 1: Panic door
+        // Row 2: Panic door
         if (g_iCostTrapDoor>=0 && g_iMaxTrapDoor>0)
             Format(buffer, sizeof(buffer), "%T %d %d/%d", "Trap Panic Door", zm_language, g_iCostTrapDoor, Trap_CountActive(ZM_TRAP_TYPE_DOOR), g_iMaxTrapDoor);
         else buffer = "-";
-        AddMenuItem(menu_traps, "item_1", buffer);
+        AddMenuItem(menu_traps, "item_2", buffer);
 
-        // Row 2: Alarm car
+        // Row 3: Alarm car
         if (g_iCostTrapCar>=0 && g_iMaxTrapCar>0)
             Format(buffer, sizeof(buffer), "%T %d %d/%d", "Trap Alarm Car", zm_language, g_iCostTrapCar, Trap_CountActive(ZM_TRAP_TYPE_CAR), g_iMaxTrapCar);
         else buffer = "-";
-        AddMenuItem(menu_traps, "item_2", buffer);
+        AddMenuItem(menu_traps, "item_3", buffer);
 
-        // Row 3: Trap Tornado
+        // Row 4: Trap Tornado
         if (g_iCostTrapTornado>=0 && g_iMaxTrapTornado>0)
             Format(buffer, sizeof(buffer), "%T %d %d/%d", "Trap Tornado", zm_language, g_iCostTrapTornado, Trap_CountActive(ZM_TRAP_TYPE_TORNADO), g_iMaxTrapTornado);
         else buffer = "-";
         buffer_add_rawline(buffer);
-        AddMenuItem(menu_traps, "item_3", buffer);
+        AddMenuItem(menu_traps, "item_4", buffer);
     }
 
 	if (zm_menu_state == ZM_MENU_TRAPS && IsValidClientZM()) open_menu(zm_client,ZM_MENU_TRAPS);
@@ -681,9 +685,10 @@ int traps_menu_Handler(Menu menu, MenuAction action, int param1, int param2)
         	switch(param2)
         	{
             	case 0: TrapExplosion_BeginArm();
-                case 1: TrapDoor_BeginArm();
-            	case 2: TrapCar_BeginArm();
-            	case 3: TrapTornado_BeginArm();
+                case 1: TrapEntity_BeginArm();
+                case 2: TrapDoor_BeginArm();
+            	case 3: TrapCar_BeginArm();
+            	case 4: TrapTornado_BeginArm();
             	default: zm_menu_state=ZM_MENU_MAIN;
         	}
         	RequestFrame(reopen_zm_menu,true);

@@ -61,9 +61,10 @@ bool DEBUG = false;
 #include <l4d2_zombie_master/unitmanager>
 #include <l4d2_zombie_master/panic>
 #include <l4d2_zombie_master/traps/traps>
+#include <l4d2_zombie_master/traps/trap_explosion>
+#include <l4d2_zombie_master/traps/trap_entity>
 #include <l4d2_zombie_master/traps/trap_door>
 #include <l4d2_zombie_master/traps/trap_car>
-#include <l4d2_zombie_master/traps/trap_explosion>
 #include <l4d2_zombie_master/traps/trap_tornado>
 #include <l4d2_zombie_master/survivor_inventory>
 
@@ -102,6 +103,7 @@ public Plugin myinfo =
 // 16. Tank music is muted when specials are frozen, unless ZM takes control of a Tank.
 // 17. New cvar: zm_enable_control. Thanks carex53 for the idea.
 // 18. Better ZM flashlight
+// 19. generic trap_use
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
@@ -294,13 +296,13 @@ public void OnPluginStart()
     g_hCostTrapCar = CreateConVar("zm_cost_trap_car", "150", "ZM cost to arm an alarm car. -1 to disable.", FCVAR_PROTECTED, true, -1.0, true, 10000.0);
     g_hCostTrapCar.AddChangeHook(ConVarChanged_Cvars_ZMenu);
 
-    g_hMaxTrapDoor = CreateConVar("zm_max_trap_door", "3", "Maximum simultaneously-armed panic doors.", FCVAR_PROTECTED, true, 0.0, true, 16.0);
+    g_hMaxTrapDoor = CreateConVar("zm_max_trap_door", "5", "Maximum simultaneously-armed panic doors.", FCVAR_PROTECTED, true, 0.0, true, 16.0);
     g_hMaxTrapDoor.AddChangeHook(ConVarChanged_Cvars_ZMenu);
 
     g_hMaxTrapCar = CreateConVar("zm_max_trap_car", "2", "Maximum simultaneously-armed alarm cars.", FCVAR_PROTECTED, true, 0.0, true, 16.0);
     g_hMaxTrapCar.AddChangeHook(ConVarChanged_Cvars_ZMenu);
 
-    g_hTrapCooldown = CreateConVar("zm_trap_cooldown", "2", "Minimum seconds between arming any two traps.", FCVAR_PROTECTED, true, 0.0, true, 120.0);
+    g_hTrapCooldown = CreateConVar("zm_trap_cooldown", "0.1", "Minimum seconds between arming any two traps.", FCVAR_PROTECTED, true, 0.0, true, 120.0);
     g_hTrapCooldown.AddChangeHook(ConVarChanged_Cvars);
 
     g_hTrapDoorBurst = CreateConVar("zm_trap_door_common_burst", "0", "Free angry commons spawned when a panic door is opened. 0 = none.", FCVAR_PROTECTED, true, 0.0, true, 50.0);

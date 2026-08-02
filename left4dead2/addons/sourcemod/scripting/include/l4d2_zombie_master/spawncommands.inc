@@ -118,7 +118,8 @@ void get_random_xy_orientation(float angle[3])
  * @param flow    If true, spawn near the highest-flow survivor instead of the aimed position
  * @param hint    If true, show HUD feedback to the ZM
  */
-void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool angry = false, bool flow = false, bool hint = true, const float t_budget_ms = HORDE_BUDGET_MS)
+void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool angry = false, bool flow = false, bool hint = true, const float t_budget_ms = HORDE_BUDGET_MS,
+			  int target_client = -1)
 {
 	if (!g_bCvarAllow) return;
 	if (!(client==zm_client || client==0)) return;
@@ -263,8 +264,7 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 	static float randomPos[3], angle[3];
 	static char set_model[PLATFORM_MAX_PATH];
     
-    int target_client = -1;
-    if (angry && !flow && IsValidClientZM()) target_client = get_spawner_target_survivor(flow);
+    if (target_client<=0 && angry && !flow && IsValidClientZM()) target_client = get_spawner_target_survivor(flow);
 
 	float t_game = GetGameTime();
 	bool can_choir = client==zm_client && sounds_choir.Length>0 && FloatAbs(t_game-t_choir)>CHOIR_COOLDOWN;
