@@ -355,8 +355,9 @@ void saferoom_glow(bool state=true)
    
    if (state && zm_stage<ZM_STARTED && g_bLockSaferoom)
    {
+       SET_TRANSMIT_ALWAYS(g_iLockedDoor);
        SetEntProp(g_iLockedDoor, Prop_Send, "m_iGlowType", 3);
-       SetEntProp(g_iLockedDoor, Prop_Send, "m_glowColorOverride", 254); //red
+       SetEntProp(g_iLockedDoor, Prop_Send, "m_glowColorOverride", 250); //red
        SetEntProp(g_iLockedDoor, Prop_Send, "m_nGlowRangeMin", 0);
    	   SetEntProp(g_iLockedDoor, Prop_Send, "m_nGlowRange", 999999);
    }

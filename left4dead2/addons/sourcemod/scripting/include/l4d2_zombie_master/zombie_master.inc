@@ -54,7 +54,7 @@ float g_fTornadoImmuneUntil[MAXPLAYERS+1]; // per-client: fall-damage immune whi
 #define ZM_TRAP_STATE_TRIGGERED 2
 
 #define TRAP_GLOW_SURV 90
-#define TRAP_GLOW_ZM   255
+#define TRAP_GLOW_ZM   200|(20<<8)|(75<<16) // RGB
 
 // enum for spawner context state. to determine spawner RGB state:
 // 0 -> GREEN
@@ -2769,7 +2769,6 @@ void JoinZM(int client)
     else zm_survivor_model = "";
     ChangeClientTeam(client,TEAM_ZM);
     remove_all_ZM_glows();
-    remove_all_ZM_trap_glows();
     stop_sound(client,true);
     L4D_CleanupPlayerState(client);
     RequestFrame(JoinZM_Post,client);
@@ -2944,6 +2943,7 @@ void QuitZM(int client, bool print = true)
        ZM_Vision_Cleanup();
        Spawner_OnDisabled(zm_client);
        remove_all_ZM_glows();
+       remove_all_ZM_trap_glows();
        delete_preview_zombie();
        zm_client = -1;
        zm_client_userid = -1;

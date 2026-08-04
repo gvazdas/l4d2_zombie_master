@@ -115,7 +115,7 @@ void TrapEntity_BeginArm()
 // Activate generic entity trap activated by survivor. Supply entity index of trap entity if known.
 stock void Activate_Entity_Trap(const int trap, const int survivor, int ent = -1)
 {
-    //LogMessage("Activate_Entity_Trap %d %d %d", trap, survivor, ent);
+    LogMessage("Activate_Entity_Trap %d %d %d", trap, survivor, ent);
     if (!g_bCvarAllow || trap<0) return;
     if (g_Traps[trap].type != ZM_TRAP_TYPE_ENTITY) return;
     if (!IsValidClient(survivor) || !IsPlayerAlive(survivor) || GetClientTeam(survivor)!=TEAM_SURVIVOR) return;
@@ -125,6 +125,7 @@ stock void Activate_Entity_Trap(const int trap, const int survivor, int ent = -1
     if (ent<=0) ent = EntRefToEntIndex(g_Traps[trap].entRef);
     if (IsValidEntity(ent) && IsValidEdict(ent)) g_iEntityToTrap[ent] = -1;
     Trap_Cleanup(trap);
+    if (IsValidClientZM()) create_traps_menu();
 }
 
 void EntityTrap_Touch(int entity, int other)

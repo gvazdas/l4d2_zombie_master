@@ -657,6 +657,30 @@ static void GridRendererProp_ResetFocus(int client)
 	g_PropPool[client].focusCreateFailed = false;
 }
 
+// Create grid owned by 0, not visible to any client.
+Action zm_debug_grid(int client, int args)
+{
+    GridRendererProp_CreatePool(0);
+	static float pos[3];
+	int idx = 0;
+	for (int i=1;i<=MaxClients;i++)
+    {
+        if (!IsValidClient(i) || i==zm_client) continue;
+		GetClientAbsOrigin(i,pos);
+		GridRendererProp_UpdateEntity(0,
+									  idx,
+									  pos,
+									  {0.0,0.0,0.0},
+									  color_allowed,
+									  GetRandomInt(0,GRIDSKIN_NEAR_XRAY),
+									  false,
+									  false);
+		idx += 1;
+		if (idx>=GRID_MAX_CELLS) break;
+    }
+    return Plugin_Continue;
+}
+
 /**
  * Create the entity pool for a client
  */
@@ -703,7 +727,9 @@ static void GridRendererProp_CreatePool(int client)
 
 		// Force-visible to the owner through walls and across the whole map, while
 		// the SDKHook_SetTransmit gate above keeps it invisible to other clients.
-		PvsForce_Register(ent, client);
+		if (client>0) PvsForce_Register(ent, client);
+
+		//SET_TRANSMIT_ALWAYS(ent); // always render (no PVS culling) -> all clients can see
 
 	}
 
@@ -1034,6 +1060,8 @@ static bool GridRendererProp_EnsureFocusMarker(int client)
 	g_PropPool[client].focusCreateFailed = false;
 
 	if (DEBUG) LogMessage("[GridRenderer Prop] Lazily created focus marker for client %d", client);
+
+	//SET_TRANSMIT_ALWAYS(focus); // always render (no PVS culling) -> all clients can see
 
 	return true;
 }

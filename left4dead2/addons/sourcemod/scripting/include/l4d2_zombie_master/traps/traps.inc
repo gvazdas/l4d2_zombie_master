@@ -135,6 +135,9 @@ public bool FilterTrapAim(int entity, int mask, int self)
 }
 
 // Resolve what the ZM is aiming at. Returns entity index (>0) or -1; fills hitPos.
+int g_iEnumerate;
+float g_fEnumerateDist;
+float g_vEnumeratePos[3];
 stock int Trap_GetAimedEntity(float hitPos[3])
 {
     if (!IsValidClientZM()) return -1;
@@ -147,7 +150,18 @@ stock int Trap_GetAimedEntity(float hitPos[3])
     {
         TR_GetEndPosition(hitPos, trace);
         ent = TR_GetEntityIndex(trace);
+        if (ent<=0 || !IsValidEntity(ent))
+        {
+            // Find nearest entity
+            g_iEnumerate = -1;
+            g_fEnumerateDist = -1.0;
+            g_vEnumeratePos = hitPos;
+            TR_EnumerateEntitiesSphere(hitPos,10.0,PARTITION_SOLID_EDICTS,AimedEnumerator);
+            if (g_iEnumerate>0 && IsValidEntity(g_iEnumerate)) ent = g_iEnumerate;
+        }
         static char cls[32];
+        GetEntityClassname(ent, cls, sizeof(cls));
+        LogMessage("Trap_GetAimedEntity %d %s", ent, cls);
         if (strncmp(cls,"prop_dynamic",12,false)==0) // prop_dynamic or prop_dynamic_ornament
         {
             int parent = GetEntPropEnt(ent,Prop_Data,"m_pParent");
@@ -156,6 +170,22 @@ stock int Trap_GetAimedEntity(float hitPos[3])
     }
     delete trace;
     return ent;
+}
+
+bool AimedEnumerator(int entity) // return true to continue enumerating, or false to stop
+{
+    if (entity>0 && IsValidEntity(entity) && HasEntProp(entity,Prop_Send,"m_vecOrigin"))
+    {
+        static float pos[3];
+        GetEntPropVector(entity, Prop_Send, "m_vecOrigin", pos);
+        float dist = GetVectorDistance(g_vEnumeratePos,pos,true);
+        if (g_fEnumerateDist<0.0 || dist<g_fEnumerateDist)
+        {
+            g_iEnumerate = entity;
+            g_fEnumerateDist = dist;
+        }
+    }
+    return true;	
 }
 
 // Reserve and populate a slot. Returns slot index or -1 if full. Deducts cost.
@@ -221,6 +251,7 @@ static int Trap_SpawnOrnament(int target, int packedColor)
 {
     if (!IsValidEntity(target)) return -1;
     int glow = CreateEntityByName("prop_dynamic_ornament");
+    //int glow = CreateEntityByName("prop_dynamic");
     if (!IsEntitySafe(glow)) return -1;
     SET_TRANSMIT_ALWAYS(target);
     static char sModelName[PLATFORM_MAX_PATH];
@@ -238,11 +269,22 @@ static int Trap_SpawnOrnament(int target, int packedColor)
     SetEntityRenderColor(glow, 0, 0, 0, 0);
     SetVariantString("!activator");
     AcceptEntityInput(glow, "SetParent", target);
+    SetEntityMoveType(glow, MOVETYPE_NONE);
     SetVariantString("!activator");
     AcceptEntityInput(glow, "SetAttached", target);
+    TeleportEntity(glow, {0.0,0.0,0.0}, NULL_VECTOR, NULL_VECTOR);
     DispatchKeyValue(glow, "targetname", "zm_trap_glow");
-    //LogMessage("Trap_SpawnOrnament %d %s", target, sModelName);
+    LogMessage("Trap_SpawnOrnament %d %s", target, sModelName);
+    RequestFrame(CheckOrnament,EntRefToEntIndex(glow));
     return glow;
+}
+
+stock void CheckOrnament(int entref)
+{
+    if (!IsValidEntRef(entref)) return;
+    float pos[3];
+    GetEntPropVector(entref, Prop_Send, "m_vecOrigin", pos);
+    LogMessage("CheckOrnament %d %.1f %.1f %.1f", entref, pos[0], pos[1], pos[2]);
 }
 
 stock int Trap_CreateDoorGlowSurv(int target)
@@ -329,8 +371,10 @@ stock void remove_all_ZM_trap_glows()
         int z = g_Traps[i].glowZMRef;
         if (IsValidEntRef(z))
         {
-            AcceptEntityInput(z, "StopGlowing");
-            RemoveEntity(z);
+            int ent = EntRefToEntIndex(z);
+            AcceptEntityInput(ent, "StopGlowing");
+            RemoveEntity(ent);
+            //LogMessage("remove_all_ZM_trap_glows %d %d %d", i, z, ent);
         }
         g_Traps[i].glowZMRef = INVALID_ENT_REFERENCE;
     }

@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.37 2026-08-02"
+#define PLUGIN_VERSION 			"0.9.37a 2026-08-04"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -46,6 +46,7 @@ bool DEBUG = false;
 #include <l4d2_zombie_master/music>
 #include <l4d2_zombie_master/glow>
 #include <l4d2_zombie_master/l4d2_pvs_force>
+//#include <l4d2_zombie_master/grid/l4d2_grid_renderer_prop>
 #include <l4d2_zombie_master/grid/l4d2_grid_renderer>
 #include <l4d2_zombie_master/los_cellcache>
 #include <l4d2_zombie_master/spawner_validate>
@@ -181,6 +182,7 @@ public void OnPluginStart()
     RegAdminCmd("zm_finale_next", zm_finale_advance, ADMFLAG_ROOT,"Trigger next finale stage. Admins only.");
     RegAdminCmd("zm_debug_player", zm_debug_player, ADMFLAG_ROOT, "Debug player state. Admins only.");
     RegAdminCmd("zm_debug_mob", zm_debug_mob, ADMFLAG_ROOT, "Debug mob state. Admins only.");
+    RegAdminCmd("zm_debug_grid", zm_debug_grid, ADMFLAG_ROOT, "Debug grid visibility. Admins only.");
 
     g_hCvarDebug = CreateConVar("zm_debug", "0", "Print plugin debug info to server.",FCVAR_PROTECTED , true, 0.0, true, 1.0);
     g_hCvarDebug.AddChangeHook(ConVarChanged_Cvars);
@@ -2444,6 +2446,8 @@ public void OnPluginEnd()
     ZM_Vision_Cleanup();
     ResetZombieModels();
     GameRules_SetProp("m_bChallengeModeActive", false, _, _, true);
+    GridRenderer_Cleanup();
+    GridRenderer_OnClientDisabled(0); // delete zm_debug_grid entities
 }
 
 void Event_TriggeredCarAlarm(Event event, const char[] name, bool dontBroadcast)
