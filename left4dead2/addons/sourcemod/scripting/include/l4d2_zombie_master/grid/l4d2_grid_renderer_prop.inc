@@ -663,7 +663,8 @@ Action zm_debug_grid(int client, int args)
     GridRendererProp_CreatePool(0);
 	if (args>0)
 	{
-		GridRenderer_HideAll(0)
+		GridRenderer_HideAll(0);
+		LogMessage("zm_debug_grid hidden");
 		return Plugin_Continue;
 	}
 	static float pos[3];
@@ -683,6 +684,7 @@ Action zm_debug_grid(int client, int args)
 		idx += 1;
 		if (idx>=GRID_MAX_CELLS) break;
     }
+	LogMessage("zm_debug_grid drew %d cells", idx);
     return Plugin_Continue;
 }
 
