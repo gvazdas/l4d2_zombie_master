@@ -46,7 +46,6 @@ bool DEBUG = false;
 #include <l4d2_zombie_master/music>
 #include <l4d2_zombie_master/glow>
 #include <l4d2_zombie_master/l4d2_pvs_force>
-//#include <l4d2_zombie_master/grid/l4d2_grid_renderer_prop>
 #include <l4d2_zombie_master/grid/l4d2_grid_renderer>
 #include <l4d2_zombie_master/los_cellcache>
 #include <l4d2_zombie_master/spawner_validate>
@@ -2133,6 +2132,7 @@ public void OnMapEnd()
 	if (DEBUG) LogMessage("[zm] OnMapEnd");
 	invalidate_survivor_cache();
 	Spawner_Cleanup();
+    GridRenderer_Cleanup();
 	if (GridLib_IsReady()) GridLib_Cleanup();
 	if (!g_bCvarAllow) return;
 	g_bRescueDoor = false;

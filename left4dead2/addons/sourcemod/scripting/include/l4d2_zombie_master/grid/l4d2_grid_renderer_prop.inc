@@ -657,10 +657,15 @@ static void GridRendererProp_ResetFocus(int client)
 	g_PropPool[client].focusCreateFailed = false;
 }
 
-// Create grid owned by 0, not visible to any client.
+// Create grid owned by 0, not visible to any client. "hide" to hide.
 Action zm_debug_grid(int client, int args)
 {
     GridRendererProp_CreatePool(0);
+	if (args>0)
+	{
+		GridRenderer_HideAll(0)
+		return Plugin_Continue;
+	}
 	static float pos[3];
 	int idx = 0;
 	for (int i=1;i<=MaxClients;i++)
@@ -730,6 +735,7 @@ static void GridRendererProp_CreatePool(int client)
 		if (client>0) PvsForce_Register(ent, client);
 
 		//SET_TRANSMIT_ALWAYS(ent); // always render (no PVS culling) -> all clients can see
+		//SET_TRANSMIT_FULLCHECK(ent); // always runs SetTransmit
 
 	}
 
@@ -907,6 +913,7 @@ static void GridRendererProp_SetGlow(int client, int idx, bool glow, const int c
 	int ent = EntRefToEntIndex(g_PropPool[client].entities[idx]);
 	if (ent == INVALID_ENT_REFERENCE || !IsValidEntity(ent))
 		return;
+	DISABLE_TRANSMIT_ALWAYS(ent);
 
 	g_PropPool[client].glowOn[idx] = glow;
 
@@ -921,8 +928,8 @@ static void GridRendererProp_SetGlow(int client, int idx, bool glow, const int c
 	}
 	else
 	{
-		SetEntProp(ent, Prop_Send, "m_glowColorOverride", 0);
 		AcceptEntityInput(ent, "StopGlowing");
+		SetEntProp(ent, Prop_Send, "m_glowColorOverride", 0);
 	}
 }
 
@@ -930,16 +937,15 @@ static void GridRendererProp_HideEntity(int client, int idx)
 {
 	if (g_PropPool[client].hidden[idx] && !g_PropPool[client].glowOn[idx])
 		return;
-
 	int ent = EntRefToEntIndex(g_PropPool[client].entities[idx]);
 	if (ent != INVALID_ENT_REFERENCE && IsValidEntity(ent))
 	{
+		SET_TRANSMIT_ALWAYS(ent);
+		AcceptEntityInput(ent, "StopGlowing");
+		SetEntProp(ent, Prop_Send, "m_glowColorOverride", 0);
 		// Set EF_NODRAW, keep EF_NOSHADOW + EF_NOINTERP
 		int effects = GetEntProp(ent, Prop_Send, "m_fEffects");
 		SetEntProp(ent, Prop_Send, "m_fEffects", effects | EF_NODRAW | EF_NOSHADOW | EF_NOINTERP);
-
-		SetEntProp(ent, Prop_Send, "m_glowColorOverride", 0);
-		AcceptEntityInput(ent, "StopGlowing");
 		g_PropPool[client].hidden[idx] = true;
 		g_PropPool[client].glowOn[idx] = false;
 		g_PropPool[client].glowRgb[idx] = 0;
@@ -1062,6 +1068,8 @@ static bool GridRendererProp_EnsureFocusMarker(int client)
 	if (DEBUG) LogMessage("[GridRenderer Prop] Lazily created focus marker for client %d", client);
 
 	//SET_TRANSMIT_ALWAYS(focus); // always render (no PVS culling) -> all clients can see
+	//SET_TRANSMIT_FULLCHECK(focus); // always runs SetTransmit
+	DISABLE_TRANSMIT_ALWAYS(focus);
 
 	return true;
 }

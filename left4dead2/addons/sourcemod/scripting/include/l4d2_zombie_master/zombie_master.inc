@@ -3169,10 +3169,24 @@ stock bool Valid_Ground(float pos[3], float dz = 40.0)
     return TR_DidHit(INVALID_HANDLE) || TR_StartSolid(INVALID_HANDLE) || TR_AllSolid(INVALID_HANDLE);
 }
 
+// Transmit to all clients always. Skips SetTransmit completely.
 stock void SET_TRANSMIT_ALWAYS(int entity)
 {
     int flags = GetEdictFlags(entity);
     SetEdictFlags(entity, flags | FL_EDICT_ALWAYS);
+}
+
+stock void DISABLE_TRANSMIT_ALWAYS(int entity)
+{
+    int flags = GetEdictFlags(entity);
+    SetEdictFlags(entity, flags & ~FL_EDICT_ALWAYS);
+}
+
+// This probably does nothing
+stock void SET_TRANSMIT_FULLCHECK(int entity)
+{
+    int flags = GetEdictFlags(entity);
+    SetEdictFlags(entity, flags | FL_EDICT_FULLCHECK);
 }
 
 stock void CLIENT_GLOW_TRANSMIT_ALWAYS(int entity)
