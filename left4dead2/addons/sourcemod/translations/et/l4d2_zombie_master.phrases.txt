@@ -658,6 +658,26 @@
 	{
 		"et"		"Aim at solid ground to place a tornado."
 	}
+	"Trap armed"
+	{
+		"et"		"Trap armed."
+	}
+	"Trap disarmed"
+	{
+		"et"		"Trap disarmed."
+	}
+	"Trap invalid"
+	{
+		"et"		"Cannot trap this."
+	}
+	"Trap Panic Object"
+	{
+		"et"		"Panic Object"
+	}
+	"Explosion"
+	{
+		"et"        "Explosion"
+	}
 
 	"Weapons"
 	{

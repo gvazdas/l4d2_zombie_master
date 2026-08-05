@@ -8,14 +8,11 @@ int g_iEntityToTrap[MAXENTITIES+1] = {-1, ...};
 // Validate entity for generic entity trap
 bool TrapEntity_CanArm(int entity)
 {
-    if (!IsValidEntity(entity) || !IsValidEdict(entity)) return false;
+    if (!IsValidEntity(entity) || !IsValidEdict(entity) || entity==zm_client) return false;
     if (IsValidClient(entity) && GetClientTeam(entity)!=TEAM_INFECTED) return false;
     static char sModelName[2];
     GetEntPropString(entity, Prop_Data, "m_ModelName", sModelName, sizeof(sModelName));
     if (sModelName[0]==0) return false;
-    //static char cls[32];
-    //GetEntityClassname(entity, cls, sizeof(cls));
-    // ban: prop_dynamic_ornament, entities with parents
     return true;
 }
 
@@ -50,7 +47,7 @@ void TrapEntity_BeginArm()
     int ent = Trap_GetAimedEntity(hitPos);
     if (ent<=0 || !TrapEntity_CanArm(ent))
     {
-        update_hint("%s", "Trap invalid entity");
+        update_hint("%T", "Trap invalid", zm_client);
         return;
     }
 
@@ -60,7 +57,7 @@ void TrapEntity_BeginArm()
     {
         g_iEntityToTrap[ent] = -1;
         Trap_Cleanup(slot);
-        update_hint("%s", "Trap deleted");
+        update_hint("%T", "Trap disarmed", zm_client);
         create_traps_menu();
         return;
     }
@@ -108,14 +105,14 @@ void TrapEntity_BeginArm()
     SDKHook(ent, SDKHook_OnTakeDamagePost, EntityTrap_TakeDamage);
 
     Trap_ConfirmArm();
-    update_hint("%s", "Trap armed");
+    update_hint("%T", "Trap armed", zm_client);
     create_traps_menu();
 }
 
 // Activate generic entity trap activated by survivor. Supply entity index of trap entity if known.
 stock void Activate_Entity_Trap(const int trap, const int survivor, int ent = -1)
 {
-    LogMessage("Activate_Entity_Trap %d %d %d", trap, survivor, ent);
+    //("Activate_Entity_Trap %d %d %d", trap, survivor, ent);
     if (!g_bCvarAllow || trap<0) return;
     if (g_Traps[trap].type != ZM_TRAP_TYPE_ENTITY) return;
     if (!IsValidClient(survivor) || !IsPlayerAlive(survivor) || GetClientTeam(survivor)!=TEAM_SURVIVOR) return;
@@ -173,11 +170,11 @@ stock bool CanEntityGlow(int entity)
 {
     static char sModelName[2];
     GetEntPropString(entity, Prop_Data, "m_ModelName", sModelName, sizeof(sModelName));
-    if (sModelName[0]=='*') return false; // no glows on brushes
+    if (sModelName[0]==0 || sModelName[0]=='*') return false; // no glows on brushes
     return HasEntProp(entity,Prop_Send,"m_iGlowType");
 }
 
-// Remove remove hooks
+// Remove hooks
 void TrapEntity_Teardown(int slot)
 {
     //if (g_Traps[slot].hookID==-1) return;

@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.37a 2026-08-04"
+#define PLUGIN_VERSION 			"0.9.37c 2026-08-05"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -105,6 +105,8 @@ public Plugin myinfo =
 // 18. Better ZM flashlight
 // 19. Generic trap, zm_panic_object
 // 20. zm_votekick
+// 21. QueueFlowCommons
+// 22. 
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
@@ -869,7 +871,7 @@ Action zm_update(Handle timer = null)
            	{
            		if (!IsValidClient(i) || !IsPlayerAlive(i) || !IsFakeClient(i) || GetClientTeam(i)!=TEAM_INFECTED) continue;
                 if (ignore_threats[i]) continue;
-           		if (GetEntProp(i, Prop_Send, "m_hasVisibleThreats")>0 || L4D2_GetSurvivorVictim(i)>0)
+           		if (L4D_HasVisibleThreats(i) || L4D2_GetSurvivorVictim(i)>0)
            		{
                		set_specials_frozen(false);
                		if (IsValidClientZM()) EmitSoundToClient(zm_client,SOUND_START,_,_,_,_,_,GetRandomInt(95,105));
@@ -888,8 +890,7 @@ Action zm_update(Handle timer = null)
                   {
                       int count = autocommon_num;
                       count -= live_zombie_arr[ZOMBIECLASS_COMMON];
-                      if (autocommon_uncommons) ZM_Horde(0,count,"random",_,true,false);
-                      else ZM_Horde(0,count,_,_,true,false);
+                      AddQueueFlowCommons(count,autocommon_uncommons ? "random" : "",_,_,_,autocommon_num);
                   }
             }
             
@@ -1038,6 +1039,7 @@ Action zm_update(Handle timer = null)
       {
           if (IsValidEntity(info_director)) AcceptEntityInput(info_director, "ForcePanicEvent");
           else L4D_ForcePanicEvent();
+          L4D_ForceSurvivalStart();
           survival_activated = false;
       }
       
@@ -1124,6 +1126,7 @@ Action zm_update(Handle timer = null)
 Action zm_new_round(Handle timer = null)
 {
     invalidate_survivor_cache();
+    ClearQueueFlowCommons();
     if (!g_bCvarAllow)
     {
         zm_stage = ZM_END;
@@ -2124,6 +2127,7 @@ public void OnMapStart()
     g_hIgnoreTankTimer = null;
     g_bIgnoreTankMusic = false;
     ZM_Vision_Cleanup();
+    ClearQueueFlowCommons();
 	
 }
 
@@ -2159,6 +2163,7 @@ public void OnMapEnd()
     musicStringTank = "";
     ResetZombieModels();
     ZM_Vision_Cleanup();
+    ClearQueueFlowCommons();
 }
 
 // this runs very frequently, find a better way.
@@ -2448,6 +2453,7 @@ public void OnPluginEnd()
     GameRules_SetProp("m_bChallengeModeActive", false, _, _, true);
     GridRenderer_Cleanup();
     GridRenderer_OnClientDisabled(0); // delete zm_debug_grid entities
+    ClearQueueFlowCommons();
 }
 
 void Event_TriggeredCarAlarm(Event event, const char[] name, bool dontBroadcast)

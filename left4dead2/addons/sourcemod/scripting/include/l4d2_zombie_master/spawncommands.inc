@@ -118,11 +118,18 @@ void get_random_xy_orientation(float angle[3])
  * @param flow    If true, spawn near the highest-flow survivor instead of the aimed position
  * @param hint    If true, show HUD feedback to the ZM
  */
-void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool angry = false, bool flow = false, bool hint = true, const float t_budget_ms = HORDE_BUDGET_MS,
-			  int target_client = -1)
+int ZM_Horde(
+			const int client = 0,
+			int count=10,
+			const char type0[16] = "",
+			bool angry = false,
+			bool flow = false,
+			bool hint = true,
+			float t_budget_ms = HORDE_BUDGET_MS,
+			int target_client = -1,
+			const bool free = false)
 {
-	if (!g_bCvarAllow) return;
-	if (!(client==zm_client || client==0)) return;
+	if (!g_bCvarAllow || (client>0 && client!=zm_client)) return 0;
 	if (DEBUG) LogMessage("[zm] ZM_Horde");
 	
 	if (client == zm_client && gamerules_allow_zClass(ZOMBIECLASS_COMMON)) update_spawner_zombieclass(ZOMBIECLASS_COMMON);
@@ -131,7 +138,7 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 	if (hint && is_zm_spamming())
 	{
 		if (client==zm_client) ZM_Sound_Deny();
-		return;
+		return 0;
 	}
 
 	CountCommons(null,false);
@@ -142,7 +149,7 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 			if (client==zm_client) ZM_Sound_Deny();
 			update_hint("%T", "Limit reached", zm_client);
 		}
-		return;
+		return 0;
 	}
 	
 	if (!is_zombie_available_cooldown(ZOMBIECLASS_COMMON))
@@ -152,7 +159,7 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 			if (client==zm_client) ZM_Sound_Deny();
 			update_hint("%T", "Cooldown active", zm_client);
 		}
-		return;
+		return 0;
 	}
 	
 	if ((live_zombie_arr[ZOMBIECLASS_COMMON]+count)>max_zombie_arr[ZOMBIECLASS_COMMON])
@@ -167,7 +174,7 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 	   		if (client==zm_client) ZM_Sound_Deny();
 			update_hint("%T", "Limit reached", zm_client);
 	   }
-	   return;
+	   return 0;
     }
 
     if (IsValidClientZM()) update_t_zm_activity();
@@ -202,7 +209,7 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 				if (client==zm_client) ZM_Sound_Deny();
 				update_hint("%T", "Limit reached", zm_client);
 			}
-			return;
+			return 0;
 		}
 		if (!force_type) count = 1;
 	}
@@ -217,7 +224,7 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 				if (client==zm_client) ZM_Sound_Deny();
 				update_hint("%T", "Limit reached", zm_client);
 			}
-			return;
+			return 0;
 		}
 		if (count>max) count = max;
    	}
@@ -226,27 +233,40 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 	bool price_angry = angry && ( !panic && !ZM_finale_announced && !L4D_IsSurvivalMode() ); // Will chasing be expensive?
 	
 	int temp_cost = calculate_infected_cost(temp_gender,price_angry);
-	if (temp_cost<0)
+	if (temp_cost<0) // negative cost -> game rules banned this type of common infected
 	{
     	if (hint)
 		{
 			if (client==zm_client) ZM_Sound_Deny();
 			update_hint("%T", "Limit reached", zm_client);
 		}
-		return;
+		return 0;
 	}
 	
-	int max_count = RoundToFloor(float(bank)/(temp_cost));
-	if (count>max_count) count = max_count;
-	
-	if ( count<=0 || (bank-temp_cost*count)<0 )
+	if (!free && temp_cost>0)
 	{
-       	if (hint)
+		int max_count = RoundToFloor(float(bank)/(temp_cost));
+		if (count>max_count) count = max_count;
+		if ( count<=0 || (bank-temp_cost*count)<0 )
 		{
-			if (client==zm_client) ZM_Sound_Deny();
-			update_hint("%T", "afford_common", zm_client);
+			if (hint)
+			{
+				if (client==zm_client) ZM_Sound_Deny();
+				update_hint("%T", "afford_common", zm_client);
+			}
+			ClearQueueFlowCommons();
+			return 0;
 		}
-		return;
+	}
+
+	if (target_client<=0 && IsValidClientZM()) target_client = get_spawner_target_survivor(flow);
+	if (target_client>0) flow = true;
+
+	if (flow && count>1) // One zombie per frame to reduce server lag.
+	{
+		AddQueueFlowCommons(count-1,type0,angry,target_client,free);
+		count = 1;
+		if (t_budget_ms>1.0) t_budget_ms = 1.0;
 	}
 
 	// Resolve spawn positions via provider
@@ -257,14 +277,12 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 	{
     	//if (zm_allow_spawns && g_iSpawnerMode>1 && hint) update_hint("%T", "Spawn failed", zm_client);
     	//update_hint_spawner(spawner_state);
-    	return;
+    	return 0;
     }
 
 	int spawned = 0;
 	static float randomPos[3], angle[3];
 	static char set_model[PLATFORM_MAX_PATH];
-    
-    if (target_client<=0 && angry && !flow && IsValidClientZM()) target_client = get_spawner_target_survivor(flow);
 
 	float t_game = GetGameTime();
 	bool can_choir = client==zm_client && sounds_choir.Length>0 && FloatAbs(t_game-t_choir)>CHOIR_COOLDOWN;
@@ -285,16 +303,17 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
 				if (client==zm_client) ZM_Sound_Deny();
 				update_hint("%T", "Limit reached", zm_client);
 			}
-			return;
+			ClearQueueFlowCommons();
+			return spawned;
 		}
-		if (temp_cost>bank)
+		if (!free && temp_cost>bank)
 		{
 			if (hint && spawned<=0)
 			{
 				if (client==zm_client) ZM_Sound_Deny();
 				update_hint("%T", "afford_common", zm_client);
 			}
-			return;
+			return spawned;
 		}
 
 		bool glow = g_bClownGlow && temp_gender==TYPE_CLOWN;
@@ -320,7 +339,7 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
         {
            if (!playcount_increased && zm_stage>=ZM_STARTED && IsValidClientZM()) increase_playcount(zm_client);
            spawned += 1;
-           bank -= temp_cost;
+           if (!free) bank -= temp_cost;
            live_zombie_arr[ZOMBIECLASS_COMMON] += 1;
            g_iEntities += 1;
            if (angry)
@@ -390,10 +409,99 @@ void ZM_Horde(const int client, int count=10, const char type0[16] = "", bool an
     	update_EMS_HUD();
 	}
 	
-	float elapsed_ms = (GetEngineTime()-t_start)*1000.0;
-	if (elapsed_ms>t_budget_ms) LogMessage("ZM_Horde ct=%d(%d) %s angry=%d flow=%d took %f ms",count,spawned,type,angry,flow,elapsed_ms);
+	if (t_budget_ms>1.0)
+	{
+		float elapsed_ms = (GetEngineTime()-t_start)*1000.0;
+		if (elapsed_ms>t_budget_ms) LogMessage("ZM_Horde ct=%d(%d) %s angry=%d flow=%d took %f ms",count,spawned,type,angry,flow,elapsed_ms);
+	}
+
+	return spawned;
 	
 }
+
+// FLOW COMMON INFECTED QUEUE
+
+enum struct CommonRequest
+{
+	char type[16];
+	bool angry;
+	int victim;
+	bool free;
+	int cap;
+}
+
+ArrayList g_CIQueue;
+int g_iQueueFlowFails;
+#define CIQUEUE_MAX_FAILS 30 // max consecutive fails
+
+// Queue up flow common infected. These get processed one per frame.
+// Optional: chase victim if panic is active or angry is true.
+// Optional cap: do not spawn any more zombies if the live count is bigger than cap.
+// AddQueueFlowCommons(count-1,type0,angry,target_client,free);
+stock void AddQueueFlowCommons(const int count, const char type0[16] = "", const bool angry = false, const int victim = -1, const bool free = false, int cap = -1)
+{
+    if (!g_bCvarAllow || zm_stage>=ZM_END || live_zombie_arr[ZOMBIECLASS_COMMON]>=max_zombie_arr[ZOMBIECLASS_COMMON]) return;
+	if (available_zombie_arr[ZOMBIECLASS_COMMON]<=0) return;
+	//LogMessage("AddQueueFlowCommons %d %s", count, type0);
+	if (g_CIQueue==null) g_CIQueue = new ArrayList(sizeof(CommonRequest));
+	bool queue_active = g_CIQueue.Length>0; 
+	static CommonRequest request;
+	request.type = type0;
+	request.angry = angry;
+	request.victim = victim;
+	request.free = free;
+	if (cap<0) request.cap = live_zombie_arr[ZOMBIECLASS_COMMON]+count;
+	else request.cap = cap;
+	for(int i = 0; i < count; i++)
+	{
+		g_CIQueue.PushArray(request); 
+	}
+	if (!queue_active)
+	{
+		g_iQueueFlowFails = 0;
+		RequestFrame(OnFrameQueueFlowCommons);
+	}
+}
+
+// Clear queued flow common infected spawns.
+stock void ClearQueueFlowCommons()
+{
+	//LogMessage("ClearQueueFlowCommons");
+	g_iQueueFlowFails = 0;
+	if (g_CIQueue==null) return;
+	g_CIQueue.Clear();
+}
+
+stock void OnFrameQueueFlowCommons()
+{
+	if (!g_bCvarAllow || zm_stage>=ZM_END || live_zombie_arr[ZOMBIECLASS_COMMON]>=max_zombie_arr[ZOMBIECLASS_COMMON] ||
+		available_zombie_arr[ZOMBIECLASS_COMMON]<=0 || g_iQueueFlowFails>=CIQUEUE_MAX_FAILS || g_CIQueue==null || g_CIQueue.Length<=0)
+	{
+		ClearQueueFlowCommons();
+		return;
+	}
+	//LogMessage("OnFrameQueueFlowCommons size %d fails %d", g_CIQueue.Length, g_iQueueFlowFails);
+	static CommonRequest request;
+	g_CIQueue.GetArray(0, request);
+	if (request.cap<live_zombie_arr[ZOMBIECLASS_COMMON])
+	{
+		g_CIQueue.Erase(0);
+		OnFrameQueueFlowCommons();
+		return;
+	}
+	if (ZM_Horde(0,1,request.type,request.angry,true,false,1.0,request.victim,request.free)>=1)
+	{
+		g_CIQueue.Erase(0);
+		g_iQueueFlowFails = 0;
+	}
+	else
+	{
+		g_iQueueFlowFails += 1;
+	}
+	if (g_CIQueue.Length>0) RequestFrame(OnFrameQueueFlowCommons);
+}
+
+
 
 /**
  * Spawn a witch at the ZM's aimed position or a fallback location. Handles cost/limit checks,
@@ -619,6 +727,8 @@ void delete_all_infected(bool common=true, bool witch=true, bool special=true)
 {
    	if (DEBUG) LogMessage("[zm] delete_all_infected");
 	bool anything_to_delete = false;
+
+	if (common) ClearQueueFlowCommons();
 
    	if (common && live_zombie_arr[ZOMBIECLASS_COMMON]>0 && !delete_common_blocked()) anything_to_delete = true;
 	else common = false;

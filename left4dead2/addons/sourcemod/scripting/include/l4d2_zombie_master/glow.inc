@@ -76,9 +76,17 @@ void GetSurvivorHealthColor_pre(int hp, int color[3], bool rescue=false, bool cr
     color[2] = arr_hp_vec[hp][2];
 }
 
+// Check if Survivor is being dominated by Special Infected and needs help.
 bool survivor_dominated(int client)
 {
-    return L4D_IsPlayerPinned(client) || L4D2_GetQueuedPummelAttacker(client)>0 || L4D2_GetSpecialInfectedDominatingMe(client)>0;
+    if (live_SI<=0) return false;
+    if (L4D_IsPlayerPinned(client)) return true;
+    //if (L4D_GetPinnedInfected(client)>0) return true; // already called in L4D_IsPlayerPinned
+    //if (L4D2_GetSpecialInfectedDominatingMe(client)>0) return true; // inefficient to call this
+    if (live_zombie_arr[ZOMBIECLASS_CHARGER]<=0) return false;
+    if (L4D2_GetQueuedPummelAttacker(client)>0) return true;
+    //if (L4D2_IsMultiCharged(client)) return true; // inefficient to call this
+    return false;
 }
 
 Action Check_Dominated(Handle timer, int victim)

@@ -643,11 +643,11 @@ void create_traps_menu()
 	menu_traps.SetTitle(buffer);
 
     // Row 0: Explosion
-    Format(buffer, sizeof(buffer), "%s %d", "Explosion", g_hCostExplosion.IntValue);
+    Format(buffer, sizeof(buffer), "%T %d", "Explosion", zm_language, g_hCostExplosion.IntValue);
     AddMenuItem(menu_traps, "item_0", buffer);
 
     // Row 1: Generic Entity Panic Trap
-    Format(buffer, sizeof(buffer), "%s %d/%d", "Panic Object", Trap_CountActive(ZM_TRAP_TYPE_ENTITY), g_iMaxTrapDoor);
+    Format(buffer, sizeof(buffer), "%T %d/%d", "Trap Panic Object", zm_language, Trap_CountActive(ZM_TRAP_TYPE_ENTITY), g_iMaxTrapDoor);
     if (g_hTraps.IntValue<=1) buffer_add_rawline(buffer);
     AddMenuItem(menu_traps, "item_1", buffer);
 

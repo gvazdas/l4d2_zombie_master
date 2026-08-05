@@ -449,7 +449,7 @@ stock int GridRendererProp_DrawCells(int client,
 		}
 	}
 
-	PvsForce_SetOrigins(client, clusterEnts, clusterSetCount);
+	if (client>0) PvsForce_SetOrigins(client, clusterEnts, clusterSetCount);
 
 	g_PropPool[client].activeCount = drawn;
 	return drawn;

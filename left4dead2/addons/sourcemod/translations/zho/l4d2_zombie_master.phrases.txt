@@ -657,6 +657,26 @@
 	{
 		"zho"		"請瞄準堅固的地面來放置龍捲風。"
 	}
+	"Trap armed"
+	{
+		"zho"		"Trap armed."
+	}
+	"Trap disarmed"
+	{
+		"zho"		"Trap disarmed."
+	}
+	"Trap invalid"
+	{
+		"zho"		"Cannot trap this."
+	}
+	"Trap Panic Object"
+	{
+		"zho"		"Panic Object"
+	}
+	"Explosion"
+	{
+		"zho"        "Explosion"
+	}
 
 	"Weapons"
 	{

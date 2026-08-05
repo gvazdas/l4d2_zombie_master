@@ -658,6 +658,26 @@
 	{
 		"fr"		"Aim at solid ground to place a tornado."
 	}
+	"Trap armed"
+	{
+		"fr"		"Trap armed."
+	}
+	"Trap disarmed"
+	{
+		"fr"		"Trap disarmed."
+	}
+	"Trap invalid"
+	{
+		"fr"		"Cannot trap this."
+	}
+	"Trap Panic Object"
+	{
+		"fr"		"Panic Object"
+	}
+	"Explosion"
+	{
+		"fr"        "Explosion"
+	}
 
 	"Weapons"
 	{

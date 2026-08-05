@@ -658,6 +658,26 @@
 	{
 		"lt"		"Aim at solid ground to place a tornado."
 	}
+	"Trap armed"
+	{
+		"lt"		"Spąstai paruošti."
+	}
+	"Trap disarmed"
+	{
+		"lt"		"Spąstai sunaikinti."
+	}
+	"Trap invalid"
+	{
+		"lt"		"Spąstai negalimi."
+	}
+	"Trap Panic Object"
+	{
+		"lt"		"Panikos Objektas"
+	}
+	"Explosion"
+	{
+		"lt"        "Sprogmuo"
+	}
 
 	"Weapons"
 	{

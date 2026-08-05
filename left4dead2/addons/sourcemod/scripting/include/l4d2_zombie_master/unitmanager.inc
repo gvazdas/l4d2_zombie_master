@@ -111,7 +111,7 @@ stock int get_occupied_units(int max, int available, int live)
 // When Freeze command is about to fire, here we check if client is fighting Survivors.
 bool should_ignore_freeze(int client)
 {
-    if (GetEntProp(client, Prop_Send, "m_hasVisibleThreats")>0) return true;
+    if (L4D_HasVisibleThreats(client)) return true;
     if (is_player_vomited(client)) return true;
     if (GetEntityFlags(client) & FL_ONFIRE) return true;
     if (L4D_IsPlayerIncapacitated(client)) return true;

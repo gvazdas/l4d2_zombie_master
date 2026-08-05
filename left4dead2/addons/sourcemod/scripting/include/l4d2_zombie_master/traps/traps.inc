@@ -118,20 +118,19 @@ stock bool Trap_CanAfford(int type, bool hint)
     return true;
 }
 
-// Accept world/props; ignore the ZM and survivors
+// Accept world and visible objects; ignore the ZM and survivors
 public bool FilterTrapAim(int entity, int mask, int self)
 {
+    if (entity==0) return true;
     if (entity==self || entity==zm_client) return false;
+    if (IsValidEntRef(entref_preview) && entity==EntRefToEntIndex(entref_preview)) return false;
     if (IsValidClient(entity))
     { 
         if (GetClientTeam(entity)==TEAM_SURVIVOR || !IsPlayerAlive(entity)) return false;
     }
-    // ignore prop_dynamic_ornament
-    //static char cls[32];
-    //GetEntityClassname(entity, cls, sizeof(cls));
-    //if (strcmp(cls,"prop_dynamic_ornament",false)==0) return false;
-    //LogMessage("FilterTrapAim %d %s", entity, cls);
-    return true;
+    static char sModelName[2];
+    GetEntPropString(entity,Prop_Data,"m_ModelName",sModelName,sizeof(sModelName));
+    return sModelName[0]!=0;
 }
 
 // Resolve what the ZM is aiming at. Returns entity index (>0) or -1; fills hitPos.
@@ -161,11 +160,11 @@ stock int Trap_GetAimedEntity(float hitPos[3])
         }
         static char cls[32];
         GetEntityClassname(ent, cls, sizeof(cls));
-        LogMessage("Trap_GetAimedEntity %d %s", ent, cls);
+        //LogMessage("Trap_GetAimedEntity %d %s", ent, cls);
         if (strncmp(cls,"prop_dynamic",12,false)==0) // prop_dynamic or prop_dynamic_ornament
         {
-            int parent = GetEntPropEnt(ent,Prop_Data,"m_pParent");
-            if (IsValidEntity(parent)) ent = parent;
+            int parent = L4D_EntityParent(ent);
+            if (parent>0 && IsValidEntity(parent)) ent = parent;
         }
     }
     delete trace;
@@ -176,6 +175,9 @@ bool AimedEnumerator(int entity) // return true to continue enumerating, or fals
 {
     if (entity>0 && IsValidEntity(entity) && HasEntProp(entity,Prop_Send,"m_vecOrigin"))
     {
+        static char sModelName[2];
+        GetEntPropString(entity,Prop_Data,"m_ModelName",sModelName,sizeof(sModelName));
+        if (sModelName[0]==0) return true;
         static float pos[3];
         GetEntPropVector(entity, Prop_Send, "m_vecOrigin", pos);
         float dist = GetVectorDistance(g_vEnumeratePos,pos,true);
@@ -245,46 +247,52 @@ public Action OnTransmitTrapDoorZM(int entity, int client)
     return Plugin_Handled;
 }
 
-// Spawn a glow ornament parented to target with the given packed color. No transmit hook here.
+// Spawn a glow parented to target with the given packed color. No transmit hook here.
 // Returns the glow entity index, or -1.
 static int Trap_SpawnOrnament(int target, int packedColor)
 {
     if (!IsValidEntity(target)) return -1;
-    int glow = CreateEntityByName("prop_dynamic_ornament");
-    //int glow = CreateEntityByName("prop_dynamic");
-    if (!IsEntitySafe(glow)) return -1;
-    SET_TRANSMIT_ALWAYS(target);
     static char sModelName[PLATFORM_MAX_PATH];
     GetEntPropString(target, Prop_Data, "m_ModelName", sModelName, sizeof(sModelName));
+    if (sModelName[0]==0 || sModelName[0]=='*') return -1;
+    static char cls[16];
+    GetEntityClassname(target, cls, sizeof(cls));
+    bool ornament = false;
+    if (strcmp(cls,"infected",false)==0 || strcmp(cls,"witch",false)==0 || strcmp(cls,"player",false)==0)
+    {
+        ornament = true;
+    }
+    else
+    {
+        ornament = HasEntProp(target,Prop_Send,"m_flPlaybackRate");
+        if (ornament) ornament = GetEntPropFloat(target, Prop_Send, "m_flPlaybackRate")>0.0;
+    }
+    int glow = CreateEntityByName(ornament ? "prop_dynamic_ornament" : "prop_dynamic_override")
+    if (!IsEntitySafe(glow)) return -1;
+    SET_TRANSMIT_ALWAYS(target);
     SetEntityModel(glow, sModelName);
+    //LogMessage("Trap_SpawnOrnament %d %d %s", target, glow, sModelName);
+    DispatchKeyValue(glow, "targetname", "zm_trap_glow");
     DispatchSpawn(glow);
-    SetEntProp(glow, Prop_Send, "m_CollisionGroup", 0);
-    SetEntProp(glow, Prop_Send, "m_nSolidType", 0);
     SetEntProp(glow, Prop_Send, "m_nGlowRangeMin", 0);
     SetEntProp(glow, Prop_Send, "m_nGlowRange", 999999);
     SetEntProp(glow, Prop_Send, "m_iGlowType", 3);
     SetEntProp(glow, Prop_Send, "m_glowColorOverride", packedColor);
+    SetEntProp(glow, Prop_Send, "m_CollisionGroup", 1);
+    SetEntProp(glow, Prop_Send, "m_nSolidType", 2);
     AcceptEntityInput(glow, "StartGlowing");
     SetEntityRenderMode(glow, view_as<RenderMode>(RENDER_TRANSCOLOR));
     SetEntityRenderColor(glow, 0, 0, 0, 0);
     SetVariantString("!activator");
     AcceptEntityInput(glow, "SetParent", target);
     SetEntityMoveType(glow, MOVETYPE_NONE);
-    SetVariantString("!activator");
-    AcceptEntityInput(glow, "SetAttached", target);
-    TeleportEntity(glow, {0.0,0.0,0.0}, NULL_VECTOR, NULL_VECTOR);
-    DispatchKeyValue(glow, "targetname", "zm_trap_glow");
-    LogMessage("Trap_SpawnOrnament %d %s", target, sModelName);
-    RequestFrame(CheckOrnament,EntRefToEntIndex(glow));
+    if (ornament)
+    {
+        SetVariantString("!activator");
+        AcceptEntityInput(glow, "SetAttached", target);
+    }
+    TeleportEntity(glow,{0.0,0.0,0.0},{0.0,0.0,0.0},NULL_VECTOR);
     return glow;
-}
-
-stock void CheckOrnament(int entref)
-{
-    if (!IsValidEntRef(entref)) return;
-    float pos[3];
-    GetEntPropVector(entref, Prop_Send, "m_vecOrigin", pos);
-    LogMessage("CheckOrnament %d %.1f %.1f %.1f", entref, pos[0], pos[1], pos[2]);
 }
 
 stock int Trap_CreateDoorGlowSurv(int target)
