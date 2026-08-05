@@ -935,28 +935,7 @@ void spawn_free_angry_zombies(int victim, int count, bool refund = true)
     if (count<=0) return;
     if (!IsValidClient(victim) || GetClientTeam(victim)!=TEAM_SURVIVOR) return;
 
-    g_iEntities = GetEntityCountEx();
-	if((g_iEntities+count)>=ENTITY_SAFER_LIMIT) return;
-
-    float vecPos[3];
-    for( int i = 0; i < count; i++  )
-    {
-        int zombie = -1;
-        if(L4D_GetRandomPZSpawnPosition(victim,ZOMBIECLASS_TANK,10,vecPos))
-        {
-            zombie = L4D_SpawnCommonInfected(vecPos);
-            if (zombie>0)
-            {
-                live_zombie_arr[ZOMBIECLASS_COMMON] += 1;
-                //if (hInfectedAttackSurvivorTeam) SDKCall(hInfectedAttackSurvivorTeam,zombie);
-                SetEntProp(zombie, Prop_Send, "m_mobRush", 1);
-                if (IsPlayerAlive(victim)) command_infected_attack(zombie,victim);
-            }
-
-        }
-    }
-
-    if (IsValidClientZM()) update_EMS_HUD();
+	ZM_Horde(0,count,"",true,true,false,_,victim,true);
 
 }
 

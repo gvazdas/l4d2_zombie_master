@@ -118,7 +118,6 @@ stock void Activate_Entity_Trap(const int trap, const int survivor, int ent = -1
     if (!IsValidClient(survivor) || !IsPlayerAlive(survivor) || GetClientTeam(survivor)!=TEAM_SURVIVOR) return;
     if (!panic) toggle_panic(true);
     ZM_Horde(0,30,"",false,true,false,_,survivor);
-    // Try RequestFrame and 0.1 delay if there aren't enough zombies
     if (ent<=0) ent = EntRefToEntIndex(g_Traps[trap].entRef);
     if (IsValidEntity(ent) && IsValidEdict(ent)) g_iEntityToTrap[ent] = -1;
     Trap_Cleanup(trap);

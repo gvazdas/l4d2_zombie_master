@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.37c 2026-08-05"
+#define PLUGIN_VERSION 			"0.9.37d 2026-08-05"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -106,7 +106,7 @@ public Plugin myinfo =
 // 19. Generic trap, zm_panic_object
 // 20. zm_votekick
 // 21. QueueFlowCommons
-// 22. 
+// 22. Boomer zombies now respect gamerules.
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
