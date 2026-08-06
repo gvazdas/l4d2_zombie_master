@@ -2284,7 +2284,7 @@ Action ZMControlSI(int client, int args)
          zm_use_notify = true;
          update_zm_flashlight();
 
-        if (g_hZMGlowingEyes.BoolValue) CreateEyeGlow(zm_client);
+        if (g_hZMGlowingEyes.BoolValue) RequestFrame(CreateEyeGlow,zm_client);
 
   	 }
   	 else update_hint("%T", "Cannot control", zm_client);

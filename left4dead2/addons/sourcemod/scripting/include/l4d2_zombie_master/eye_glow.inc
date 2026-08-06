@@ -47,11 +47,16 @@ Action ZM_Debug_Eye(int client, int args)
             if (args>2) dz = GetCmdArgFloat(3);
         }
    }
-   CreateEyeGlow(target,dx,dy,dz);
+   CreateEyeGlowOffsets(target,dx,dy,dz);
    return Plugin_Continue;
 }
 
-stock bool CreateEyeGlow(const int client, float dx = 0.0, float dy = 0.0, float dz = 0.0)
+stock void CreateEyeGlow(const int client)
+{
+    CreateEyeGlowOffsets(client);
+}
+
+stock bool CreateEyeGlowOffsets(const int client, float dx = 0.0, float dy = 0.0, float dz = 0.0)
 {
     if (!IsValidClient(client) || GetClientTeam(client)!=TEAM_INFECTED) return false;
     CleanUpEyeGlow();
