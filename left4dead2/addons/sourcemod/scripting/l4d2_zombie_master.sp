@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.37d 2026-08-05"
+#define PLUGIN_VERSION 			"0.9.37e 2026-08-06"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -67,6 +67,7 @@ bool DEBUG = false;
 #include <l4d2_zombie_master/traps/trap_car>
 #include <l4d2_zombie_master/traps/trap_tornado>
 #include <l4d2_zombie_master/survivor_inventory>
+#include <l4d2_zombie_master/eye_glow>
 
 #undef REQUIRE_PLUGIN
 #include <adminmenu>
@@ -107,6 +108,7 @@ public Plugin myinfo =
 // 20. zm_votekick
 // 21. QueueFlowCommons
 // 22. Boomer zombies now respect gamerules.
+// 23. ZM glowing eyes.
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
@@ -184,6 +186,7 @@ public void OnPluginStart()
     RegAdminCmd("zm_debug_player", zm_debug_player, ADMFLAG_ROOT, "Debug player state. Admins only.");
     RegAdminCmd("zm_debug_mob", zm_debug_mob, ADMFLAG_ROOT, "Debug mob state. Admins only.");
     RegAdminCmd("zm_debug_grid", zm_debug_grid, ADMFLAG_ROOT, "Debug grid visibility. Admins only.");
+    RegAdminCmd("zm_debug_eye", ZM_Debug_Eye, ADMFLAG_ROOT, "Debug SI glowing eye placement. Admins only.");
 
     g_hCvarDebug = CreateConVar("zm_debug", "0", "Print plugin debug info to server.",FCVAR_PROTECTED , true, 0.0, true, 1.0);
     g_hCvarDebug.AddChangeHook(ConVarChanged_Cvars);
@@ -426,6 +429,9 @@ public void OnPluginStart()
     g_hCostAngry = CreateConVar("zm_cost_angry", "25", "Additive cost to make common infected chase survivors. -1 to disable.",FCVAR_PROTECTED, true, -1.0, true, 10000.0);
     g_hCostAngry.AddChangeHook(ConVarChanged_Cvars_ZMenu);
 
+    g_hFlowCommonQueue = CreateConVar("zm_common_flow_queue", "1", "For flow commons, spawn one zombie per frame. Reduces peak lag but increases average overhead.",FCVAR_PROTECTED, true, 0.0, true, 1.0);
+
+    g_hZMGlowingEyes = CreateConVar("zm_glowing_eyes", "1", "ZM control special infected will have glowing eyes.",FCVAR_PROTECTED, true, 0.0, true, 1.0);
 
     // r_screenoverlay is cheat-flagged by default; strip the flag so the gnome
     // effect can push a per-client overlay without sv_cheats.
@@ -883,6 +889,7 @@ Action zm_update(Handle timer = null)
         
         if (autocommon_setting>0 && (t_now-t_last_autocommon)>=autocommon_updaterate)
         {
+            // Automatic Common Infected
             if ( autocommon_setting>=AUTOCOMMON_ALWAYS || 
                       ( (panic || L4D_IsSurvivalMode() || ZM_finale_announced) && autocommon_setting>=AUTOCOMMON_PANIC ) )
             {
@@ -894,26 +901,49 @@ Action zm_update(Handle timer = null)
                   }
             }
             
-            if ( autocommon_setting==AUTOCOMMON_ALWAYS && !IsValidClientZM() && live_SI<max_SI && available_SI>0 && (available_SI>1 || GetRandomFloat(0.0,1.0)<0.25) )
+            if ( autocommon_setting==AUTOCOMMON_ALWAYS && !IsValidClientZM() )
             {
-               	ArrayList classes = new ArrayList();
-               	for (int i = 1; i <= 6; i++)
-               	{
-               		if (costs_SI[i]>=0 && max_zombie_arr[i]>0 && available_zombie_arr[i]>0) classes.Push(i); 
-               	}
-               	if (classes.Length>0)
-               	{
-                   	int zClass;
-                   	if (classes.Length==1) zClass = classes.Get(0);
-                   	else zClass = classes.Get(GetRandomInt(0,classes.Length-1));
-                    if (bank>=(3*costs_SI[zClass]))
+               	// Automatic Special Infected
+                int bot = -1;
+                if (live_SI<max_SI && available_SI>0 && (available_SI>1 || GetRandomFloat(0.0,1.0)<0.25))
+                {
+                    ArrayList classes = new ArrayList();
+                    for (int i = 1; i <= 6; i++)
                     {
-                        int bot = ZM_Spawn_SI(0,zClass,false,false,_,false,true);
-                        if (IsValidClient(bot)) DispatchKeyValue(bot, "targetname", "zm_unit");
+                        if (costs_SI[i]>=0 && max_zombie_arr[i]>0 && available_zombie_arr[i]>0) classes.Push(i); 
                     }
-                    
+                    if (costs_SI[ZOMBIECLASS_TANK]>=0 && max_zombie_arr[ZOMBIECLASS_TANK]>0 && available_zombie_arr[ZOMBIECLASS_TANK]>0)
+                    {
+                        classes.Push(ZOMBIECLASS_TANK); 
+                    }
+                    if (classes.Length>0)
+                    {
+                        int zClass;
+                        if (classes.Length==1) zClass = classes.Get(0);
+                        else zClass = classes.Get(GetRandomInt(0,classes.Length-1));
+                        if (bank>=(3*costs_SI[zClass]))
+                        {
+                            bot = ZM_Spawn_SI(0,zClass,false,false,_,false,true);
+                            if (IsValidClient(bot)) DispatchKeyValue(bot, "targetname", "zm_unit");
+                        }
+                    }
+                    delete classes;
                 }
-                delete classes;
+
+                // Automatic Witch
+                if (!IsValidClient(bot) && live_zombie_arr[ZOMBIECLASS_WITCH]<max_zombie_arr[ZOMBIECLASS_WITCH] && (max_SI<=1 || GetRandomFloat(0.0,1.0)<0.25))
+                {
+                    int witch_type = -1;
+                    if (g_iCostWitchMoving<0) witch_type = WITCH_STATIC;
+                    else if (g_iCostWitchStatic<0) witch_type = WITCH_MOVING;
+                    else
+                    {
+                        if (GetRandomFloat()>=0.25) witch_type = g_iCostWitchMoving<g_iCostWitchStatic ? WITCH_MOVING : WITCH_STATIC; // cheap
+                        else witch_type = g_iCostWitchMoving<g_iCostWitchStatic ? WITCH_STATIC : WITCH_MOVING; // expensive
+                    }
+                    int cost = witch_type==WITCH_STATIC ? g_iCostWitchStatic : g_iCostWitchMoving;
+                    if (cost>=0 && bank>=(3*cost)) ZM_Witch(0,witch_type,_,true);
+                }
             }
             
             t_last_autocommon = t_now;
@@ -1024,6 +1054,7 @@ Action zm_update(Handle timer = null)
       zm_fake_gamemode(); // have to run this periodically or it gets reset
       if (!IsPlayerAlive(zm_client))
       {
+          CleanUpEyeGlow();
           DispatchKeyValue(zm_client, "targetname", "zm_client");
           if (GetEntityMoveType(zm_client)!=MOVETYPE_NONE) SetEntityMoveType(zm_client, MOVETYPE_NOCLIP);
           if (!IsValidEntRef(entref_control) && live_SI>0)
@@ -1093,6 +1124,7 @@ Action zm_update(Handle timer = null)
    }
    else
    {
+      CleanUpEyeGlow();
       if (!IsValidClient(client_offer) && fq_timer==INVALID_HANDLE) fq_timer = CreateTimer(1.0,fair_queue_update);
       if (!IsValidClientZM() && zm_client_userid!=-1)
       {
@@ -1871,7 +1903,7 @@ public void OnMapStart()
 {
     if (DEBUG) LogMessage("[zm] OnMapStart");
 
-    //PluginPrecacheModel(MODEL_LIGHT);
+    PrecacheParticle(PARTICLE_ZM_EYE);
 
 	PluginPrecacheModel(MODEL_SMOKER);
 	PluginPrecacheModel(MODEL_BOOMER);
@@ -2164,6 +2196,7 @@ public void OnMapEnd()
     ResetZombieModels();
     ZM_Vision_Cleanup();
     ClearQueueFlowCommons();
+    CleanUpEyeGlow();
 }
 
 // this runs very frequently, find a better way.
@@ -2454,6 +2487,7 @@ public void OnPluginEnd()
     GridRenderer_Cleanup();
     GridRenderer_OnClientDisabled(0); // delete zm_debug_grid entities
     ClearQueueFlowCommons();
+    CleanUpEyeGlow();
 }
 
 void Event_TriggeredCarAlarm(Event event, const char[] name, bool dontBroadcast)

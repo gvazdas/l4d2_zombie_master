@@ -383,7 +383,8 @@ void create_uncommon_menu()
     if (g_hCostAngry.IntValue>=0 && !panic && !ZM_finale_announced && !L4D_IsSurvivalMode())
     {
         if (g_iCostCommon>=0 && !b_ValidUncommon) Format(buffer,sizeof(buffer),"%T %d", "Angry", zm_language, g_iCostCommon+g_hCostAngry.IntValue);
-        else Format(buffer,sizeof(buffer),"%T %d", "Angry", zm_language, g_iCostUncommon+g_hCostAngry.IntValue);
+        else if (g_iCostUncommon>=0) Format(buffer,sizeof(buffer),"%T %d", "Angry", zm_language, g_iCostUncommon+g_hCostAngry.IntValue);
+        else buffer = "-";
     }
     else buffer = "-";
     AddMenuItem(menu_uncommon, "item_7", buffer);

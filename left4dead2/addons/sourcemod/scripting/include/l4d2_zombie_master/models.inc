@@ -81,7 +81,7 @@ stock int label_to_gender(const char arg[16])
                 if (g_hCostRiot.IntValue>=0) return iRandomInfectedTypes[GetRandomInt(0,sizeof(iRandomInfectedTypes)-1)];
                 return iRandomInfectedTypes[GetRandomInt(1,sizeof(iRandomInfectedTypes)-1)];
             }
-            else if (strcmp(arg,"riot")==0 && g_hCostRiot.IntValue>=0) return TYPE_RIOT;
+            else if (strcmp(arg,"riot")==0 && g_hCostRiot.IntValue>=0 && g_iCostUncommon>=0) return TYPE_RIOT;
             else if (strcmp(arg,"road")==0) return TYPE_ROAD_WORKER;
         }
         case 'c':

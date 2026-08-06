@@ -449,6 +449,8 @@ bool zm_flow_notify = false; // "Flow hint"
 // Notify ZM about maximum Tank discount.
 bool zm_discount_notify = false; // "Max tank discount"
 
+ConVar g_hFlowCommonQueue, g_hZMGlowingEyes;
+
 ConVar g_hBankRateBase, g_hBankRatePlayer, g_hBankInitial, g_hBankInitialPlayer, g_hStopInactivity, g_hMaxUniqueSI, g_hRandomizer, g_hNoTanks,
        g_hUpdateRate, g_hMaxCommons, g_hSpawnMinDistance, g_hBonusCarAlarm, g_hBonusFinaleStage, g_hPanicCost, g_hBonusSurvival, g_hAbilityCooldown,
        g_hCostBoomer, g_hCostSpitter, g_hCostHunter, g_hCostSmoker, g_hCostJockey, g_hMaxWitches, g_hMaxSI, g_hSpecialCooldown, g_hNoZMWarn,
@@ -1991,7 +1993,7 @@ stock bool IsValidEntity_Safe(int entity)
 
 stock bool IsEntitySafe(int entity)
 {
-	if(entity == -1) return false;
+	if(entity == -1 || !IsValidEntity(entity)) return false;
 	if(entity >= ENTITY_SAFER_LIMIT)
 	{
 		RemoveEntity(entity);
@@ -2122,7 +2124,6 @@ Action ZMControlSI(int client, int args)
     // ZM wants to let go of special infected.
     if ( IsPlayerAlive(zm_client) && GetClientTeam(zm_client)==TEAM_INFECTED && !L4D_IsPlayerIncapacitated(zm_client) )
     {
-        
         int health = GetEntProp(zm_client,Prop_Data,"m_iHealth");
         if (zClass==ZOMBIECLASS_BOOMER && health==0)
         {
@@ -2203,6 +2204,7 @@ Action ZMControlSI(int client, int args)
             L4D2_RemoveEntityGlow(zm_client);
             SetEntProp(zm_client, Prop_Send, "m_iGlowType", 0);
 	        SetEntProp(zm_client, Prop_Send, "m_glowColorOverride", 0);
+            CleanUpEyeGlow();
         }
         else update_hint("%T", "Cannot control", zm_client);
         
@@ -2281,6 +2283,9 @@ Action ZMControlSI(int client, int args)
          transfer_SI_properties(zm_client,sModelName,vOrigin,vAngles,vVelocity,health,maxhealth,fFlags,timestamp_cooldown,targetName,vomit_timestamp,stagger);
          zm_use_notify = true;
          update_zm_flashlight();
+
+        if (g_hZMGlowingEyes.BoolValue) CreateEyeGlow(zm_client);
+
   	 }
   	 else update_hint("%T", "Cannot control", zm_client);
 
@@ -2858,7 +2863,7 @@ void JoinZM_Post(int client)
     zm_just_joined = true;
     if (GetClientTeam(client)==TEAM_ZM) RequestFrame(ZM_ClientCleanup); // should clear vignettes, post processing effects, etc.
     //ZM_ClientCleanup(); // should clear vignettes, post processing effects, etc.
-
+    CleanUpEyeGlow();
     RequestFrame(restore_all_ZM_trap_glows);
 
 }
@@ -2950,6 +2955,7 @@ void QuitZM(int client, bool print = true)
        zm_menu_state = ZM_MENU_CLOSED;
        fair_queue_update(null);
        check_zm_model = zm_survivor_model[0] != 0;
+       CleanUpEyeGlow();
     }
     
     if (IsValidClient(client) && GetClientTeam(client)!=TEAM_SURVIVOR)

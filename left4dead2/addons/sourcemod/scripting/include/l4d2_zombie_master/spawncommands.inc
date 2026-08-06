@@ -262,7 +262,7 @@ int ZM_Horde(
 	if (target_client<=0 && IsValidClientZM()) target_client = get_spawner_target_survivor(flow);
 	if (target_client>0) flow = true;
 
-	if (flow && count>1) // One zombie per frame to reduce server lag.
+	if (g_hFlowCommonQueue.BoolValue && flow && count>1) // One zombie per frame to reduce server lag.
 	{
 		AddQueueFlowCommons(count-1,type0,angry,target_client,free);
 		count = 1;
@@ -437,11 +437,22 @@ int g_iQueueFlowFails;
 // Queue up flow common infected. These get processed one per frame.
 // Optional: chase victim if panic is active or angry is true.
 // Optional cap: do not spawn any more zombies if the live count is bigger than cap.
-// AddQueueFlowCommons(count-1,type0,angry,target_client,free);
 stock void AddQueueFlowCommons(const int count, const char type0[16] = "", const bool angry = false, const int victim = -1, const bool free = false, int cap = -1)
 {
     if (!g_bCvarAllow || zm_stage>=ZM_END || live_zombie_arr[ZOMBIECLASS_COMMON]>=max_zombie_arr[ZOMBIECLASS_COMMON]) return;
 	if (available_zombie_arr[ZOMBIECLASS_COMMON]<=0) return;
+	if (cap>0 && live_zombie_arr[ZOMBIECLASS_COMMON]>=cap) return;
+	if (!g_hFlowCommonQueue.BoolValue)
+	{
+		int final_count = count;
+		if (cap>0)
+		{
+			int max_count = cap - live_zombie_arr[ZOMBIECLASS_COMMON];
+			if (final_count>max_count) final_count = max_count;
+		}
+		ZM_Horde(0,final_count,type0,angry,true,false,_,victim,free);
+		return;
+	}
 	//LogMessage("AddQueueFlowCommons %d %s", count, type0);
 	if (g_CIQueue==null) g_CIQueue = new ArrayList(sizeof(CommonRequest));
 	bool queue_active = g_CIQueue.Length>0; 
@@ -450,7 +461,7 @@ stock void AddQueueFlowCommons(const int count, const char type0[16] = "", const
 	request.angry = angry;
 	request.victim = victim;
 	request.free = free;
-	if (cap<0) request.cap = live_zombie_arr[ZOMBIECLASS_COMMON]+count;
+	if (cap<0) request.cap = max_zombie_arr[ZOMBIECLASS_COMMON];
 	else request.cap = cap;
 	for(int i = 0; i < count; i++)
 	{
@@ -512,11 +523,10 @@ stock void OnFrameQueueFlowCommons()
  * @param free        If true, skip cost deduction
  * @param flow        If true, spawn near the highest-flow survivor
  */
-void ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
+bool ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
 {
-
-	if (!g_bCvarAllow) return;
-	if (!(client==zm_client || client==0)) return;
+	if (!g_bCvarAllow) return false;
+	if (client>0 && client!=zm_client) return false;
 	if (client == zm_client)
 	{
 		if (gamerules_allow_zClass(ZOMBIECLASS_WITCH)) update_spawner_zombieclass(ZOMBIECLASS_WITCH);
@@ -525,10 +535,10 @@ void ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
 
 	if (DEBUG) LogMessage("[zm] ZM_Witch");
 
-	if (is_zm_spamming())
+	if (client==zm_client && is_zm_spamming())
 	{
-		if (client==zm_client) ZM_Sound_Deny();
-		return;
+		ZM_Sound_Deny();
+		return false;
 	}
 
 	int temp_cost;
@@ -538,25 +548,34 @@ void ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
     	else temp_cost=g_iCostWitchMoving;
     	if ((bank-temp_cost)<0)
     	{
-        	if (client==zm_client) ZM_Sound_Deny();
-			update_hint("%T", "Cannot afford", zm_client);
-        	return;
+        	if (client==zm_client)
+			{
+				ZM_Sound_Deny();
+				update_hint("%T", "Cannot afford", zm_client);
+			}
+			return false;
     	}
 	}
 
 	CountWitches(false);
 	if (live_zombie_arr[ZOMBIECLASS_WITCH]>=max_zombie_arr[ZOMBIECLASS_WITCH] || temp_cost<0)
 	{
-    	if (client==zm_client) ZM_Sound_Deny();
-		update_hint("%T", "Limit reached", zm_client);
-    	return;
+    	if (client==zm_client)
+		{
+			ZM_Sound_Deny();
+			update_hint("%T", "Limit reached", zm_client);
+		}
+		return false;
 	}
 
 	if (!is_zombie_available_cooldown(ZOMBIECLASS_WITCH))
 	{
-    	if (client==zm_client) ZM_Sound_Deny();
-		update_hint("%T", "Cooldown active", zm_client);
-        return;
+    	if (client==zm_client)
+		{
+			ZM_Sound_Deny();
+			update_hint("%T", "Cooldown active", zm_client);
+		}
+		return false;
 	}
 
 	if (IsValidClientZM()) update_t_zm_activity();
@@ -565,7 +584,7 @@ void ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
 	if (!Spawner_ResolveWitchPosition(flow,spawn_pos))
 	{
 	    //if (zm_allow_spawns && g_iSpawnerMode>1) update_hint("%T", "Spawn failed", zm_client);
-	    return;
+	    return false;
 	}
 
 	if (witch_type==WITCH_STATIC) SetConVarInt(FindConVar("sv_force_time_of_day"),0);
@@ -594,20 +613,26 @@ void ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
        	CreateTimer(g_fUpdateRate, CreateZMGlow_white, EntIndexToEntRef(witch), TIMER_FLAG_NO_MAPCHANGE);
        	entref_delete = EntIndexToEntRef(witch);
        	add_available_zombie(ZOMBIECLASS_WITCH,-1);
-       	static char label[32];
-   	    Format(label, sizeof(label), "%T", "Witch", zm_client);
-   	    update_hint("%T", "Spawned X Y", zm_client, 1, label);
+		if (client==zm_client)
+		{
+			static char label[32];
+			Format(label, sizeof(label), "%T", "Witch", zm_client);
+			update_hint("%T", "Spawned X Y", zm_client, 1, label);
+			Spawner_NotifySpawned(witch);
+		}
        	DispatchKeyValue(witch, "targetname", "zm_unit");
-       	Spawner_NotifySpawned(witch);
-       	if (!playcount_increased && zm_stage>=ZM_STARTED) increase_playcount(zm_client);
+       	if (client==zm_client && !playcount_increased && zm_stage>=ZM_STARTED) increase_playcount(zm_client);
        	if (g_hCursed.BoolValue)
        	{
            	SetEntPropFloat(witch,Prop_Send,"m_flModelScale",GetRandomFloat(0.5,2.0));
            	ChangeEdictState(witch);
        	}
 		g_iCostList[witch] = temp_cost;
+		return true;
 	}
-	else update_hint("%T", "Spawn failed", zm_client);
+	else if (client==zm_client) update_hint("%T", "Spawn failed", zm_client);
+
+	return false;
 
 }
 

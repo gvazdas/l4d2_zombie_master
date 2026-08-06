@@ -517,8 +517,8 @@ void update_dynamic_tank()
 // Calculate cost to spawn infected entity. -1 if spawning is illegal.
 stock int calculate_infected_cost(const int gender = 1, const bool angry = false)
 {
-    int cost = 0;
-    if (gender==TYPE_RIOT) cost = g_hCostRiot.IntValue;
+    int cost = -1;
+    if (gender==TYPE_RIOT && g_iCostUncommon>=0) cost = g_hCostRiot.IntValue;
     else if (gender>=TYPE_CEDA) cost = g_iCostUncommon;
     else cost = g_iCostCommon;
 
