@@ -334,6 +334,12 @@ int ZM_Horde(
                 if (temp_gender==TYPE_FALLEN) SetEntProp(zombie,Prop_Send,"m_nBody",GetRandomInt(0,1));
           	}
 		}
+		if ( ( temp_gender==TYPE_FALLEN && !IsEntitySafe(zombie,false) ) || !IsEntitySafe(zombie))
+		{
+			zombie = -1;
+			ClearQueueFlowCommons();
+			break;
+		}
 		
         if (zombie>0)
         {
@@ -367,6 +373,7 @@ int ZM_Horde(
 				t_choir = t_game;
 				can_choir = false;
 			}
+			if (temp_gender==TYPE_FALLEN) SDKHook(zombie, SDKHook_OnTakeDamage, Fallen_OnTakeDamage);
         }
         if ((GetEngineTime()-t_start)*1000.0>t_budget_ms) break;
     }
@@ -593,9 +600,10 @@ bool ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
 	static float angle[3];
 	get_random_xy_orientation(angle);
 
-	int witch;
+	int witch = -1;
 	if(g_bSpawnWitchBride) witch = L4D2_SpawnWitchBride(spawn_pos,angle);
     else witch = L4D2_SpawnWitch(spawn_pos,angle);
+	if (!IsEntitySafe(witch)) witch = -1;
 
 	if (witch>0)
 	{

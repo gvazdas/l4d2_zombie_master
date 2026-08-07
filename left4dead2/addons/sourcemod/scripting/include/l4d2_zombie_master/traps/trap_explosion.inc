@@ -66,7 +66,7 @@ Action ZM_Explode(Handle timer, int slot)
         case 2: sound_explosion = EXPLOSION2;
         case 3: sound_explosion = EXPLOSION3;
     }
-    EmitSoundToAll(sound_explosion,SOUND_FROM_WORLD,_,SNDLEVEL_GUNFIRE,_,0.5,_,_,g_Traps[slot].pos);
+    EmitSoundToAll(sound_explosion,SOUND_FROM_WORLD,_,SNDLEVEL_GUNFIRE,_,0.75,_,_,g_Traps[slot].pos);
     Trap_Cleanup(slot);
     return Plugin_Stop;
 }

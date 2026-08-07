@@ -1991,10 +1991,10 @@ stock bool IsValidEntity_Safe(int entity)
 	return ( entity && entity != INVALID_ENT_REFERENCE && IsValidEntity(entity) );
 }
 
-stock bool IsEntitySafe(int entity)
+stock bool IsEntitySafe(int entity, bool safer = true)
 {
 	if(entity == -1 || !IsValidEntity(entity)) return false;
-	if(entity >= ENTITY_SAFER_LIMIT)
+	if( (safer && entity>=ENTITY_SAFER_LIMIT) || entity>=ENTITY_SAFE_LIMIT )
 	{
 		RemoveEntity(entity);
 		return false;

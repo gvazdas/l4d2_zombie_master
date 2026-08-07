@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.37e 2026-08-06"
+#define PLUGIN_VERSION 			"0.9.38 2026-08-07"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -91,7 +91,7 @@ public Plugin myinfo =
 // 3. New cvar: zm_enable_control
 // 4. New cvar: zm_cost_riot 50
 // 5. New cvar: zm_cost_angry 25
-// 6. Better Fallen Survivor logic. Infinite fallen survivors.
+// 6. Better Fallen Survivor logic. Infinite fallen survivors. TBD: FIX LIMITS
 // 7. More robust refund logic for common infected and witches.
 // 8. Fixed extra survivor bot appearing after round end. Thanks to deathcycle for reporting.
 // 9. "Give Up" and round end will try to assign the ZM player back to their original survivor. Thanks to deathcycle for the idea.
@@ -106,9 +106,11 @@ public Plugin myinfo =
 // 18. Better ZM flashlight
 // 19. Generic trap, zm_panic_object
 // 20. zm_votekick
-// 21. QueueFlowCommons
-// 22. Boomer zombies now respect gamerules.
+// 21. QueueFlowCommons -> reduce server lag
+// 22. Boomer-spawned Common Infected now respect gamerules.
 // 23. ZM glowing eyes.
+
+// FIX GRID CELLS VISIBLE
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
@@ -716,7 +718,7 @@ void IsAllowed()
 
         Music_Monitor_Enable();
 
-        if (g_hMaxFallen) SetConVarInt(g_hMaxFallen,1000);
+        if (g_hMaxFallen) SetConVarInt(g_hMaxFallen,2);
         SetConVarInt(FindConVar("z_fallen_kill_suppress_time"),0);
 		
 	}
@@ -1200,7 +1202,7 @@ Action zm_new_round(Handle timer = null)
 	zm_win_announced = false;
 	
 	enable_challenge_mode();
-    if (g_hMaxFallen) SetConVarInt(g_hMaxFallen,1000);
+    if (g_hMaxFallen) SetConVarInt(g_hMaxFallen,2);
     SetConVarInt(FindConVar("z_fallen_kill_suppress_time"),0);
 	
 	costs_SI[ZOMBIECLASS_TANK] = g_hCostTank.IntValue;

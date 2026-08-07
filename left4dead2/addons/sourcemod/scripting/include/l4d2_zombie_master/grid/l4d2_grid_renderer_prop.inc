@@ -858,6 +858,7 @@ static void GridRendererProp_UpdateEntity(int client, int idx,
 	int ent = EntRefToEntIndex(g_PropPool[client].entities[idx]);
 	if (ent == INVALID_ENT_REFERENCE || !IsValidEntity(ent))
 		return;
+	DISABLE_TRANSMIT_ALWAYS(ent);
 
 	TeleportEntity(ent, position, angles, NULL_VECTOR);
 	if (GridRendererProp_ColorChanged(client, idx, color))
@@ -884,6 +885,7 @@ static void GridRendererProp_UpdateEntityColor(int client, int idx, const int co
 	int ent = EntRefToEntIndex(g_PropPool[client].entities[idx]);
 	if (ent == INVALID_ENT_REFERENCE || !IsValidEntity(ent))
 		return;
+	DISABLE_TRANSMIT_ALWAYS(ent);
 
 	if (GridRendererProp_ColorChanged(client, idx, color))
 		SetEntityRenderColor(ent, color[0], color[1], color[2], color[3]);
@@ -915,7 +917,6 @@ static void GridRendererProp_SetGlow(int client, int idx, bool glow, const int c
 	int ent = EntRefToEntIndex(g_PropPool[client].entities[idx]);
 	if (ent == INVALID_ENT_REFERENCE || !IsValidEntity(ent))
 		return;
-	DISABLE_TRANSMIT_ALWAYS(ent);
 
 	g_PropPool[client].glowOn[idx] = glow;
 
@@ -939,19 +940,18 @@ static void GridRendererProp_HideEntity(int client, int idx)
 {
 	if (g_PropPool[client].hidden[idx] && !g_PropPool[client].glowOn[idx])
 		return;
+	if (g_PropPool[client].entities[idx]==INVALID_ENT_REFERENCE) return;
 	int ent = EntRefToEntIndex(g_PropPool[client].entities[idx]);
-	if (ent != INVALID_ENT_REFERENCE && IsValidEntity(ent))
-	{
-		SET_TRANSMIT_ALWAYS(ent);
-		AcceptEntityInput(ent, "StopGlowing");
-		SetEntProp(ent, Prop_Send, "m_glowColorOverride", 0);
-		// Set EF_NODRAW, keep EF_NOSHADOW + EF_NOINTERP
-		int effects = GetEntProp(ent, Prop_Send, "m_fEffects");
-		SetEntProp(ent, Prop_Send, "m_fEffects", effects | EF_NODRAW | EF_NOSHADOW | EF_NOINTERP);
-		g_PropPool[client].hidden[idx] = true;
-		g_PropPool[client].glowOn[idx] = false;
-		g_PropPool[client].glowRgb[idx] = 0;
-	}
+	if (!IsValidEntity(ent)) return;
+	SET_TRANSMIT_ALWAYS(ent);
+	AcceptEntityInput(ent, "StopGlowing");
+	SetEntProp(ent, Prop_Send, "m_glowColorOverride", 0);
+	// Set EF_NODRAW, keep EF_NOSHADOW + EF_NOINTERP
+	int effects = GetEntProp(ent, Prop_Send, "m_fEffects");
+	SetEntProp(ent, Prop_Send, "m_fEffects", effects | EF_NODRAW | EF_NOSHADOW | EF_NOINTERP);
+	g_PropPool[client].hidden[idx] = true;
+	g_PropPool[client].glowOn[idx] = false;
+	g_PropPool[client].glowRgb[idx] = 0;
 }
 
 void GridRendererProp_HideAll(int client)
@@ -1088,13 +1088,14 @@ static void GridRendererProp_HideFocusMarker(int client)
 		SetEntProp(ent, Prop_Send, "m_fEffects", effects | EF_NODRAW | EF_NOSHADOW | EF_NOINTERP);
 		g_PropPool[client].focusHidden = true;
 	}
+	SET_TRANSMIT_ALWAYS(ent);
 }
 
 static void GridRendererProp_UpdateFocusMarker(int client, const float position[3], const float angles[3], float scale)
 {
 	int ent = EntRefToEntIndex(g_PropPool[client].focusEntity);
-	if (ent == INVALID_ENT_REFERENCE || !IsValidEntity(ent))
-		return;
+	if (ent == INVALID_ENT_REFERENCE || !IsValidEntity(ent)) return;
+	DISABLE_TRANSMIT_ALWAYS(ent);
 
 	TeleportEntity(ent, position, angles, NULL_VECTOR);
 

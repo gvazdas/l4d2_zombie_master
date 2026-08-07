@@ -217,7 +217,8 @@ stock void transfer_SI_properties(int entity_new, char[] modelname, float vOrigi
 {
    if (!IsValidClient(entity_new)) return;
    int zClass = GetEntProp(entity_new, Prop_Send, "m_zombieClass");
-   if (zClass!=ZOMBIECLASS_BOOMER) SetEntityModel(entity_new, modelname); // gender swapping boomers because that's hilarious
+   //if (zClass!=ZOMBIECLASS_BOOMER) SetEntityModel(entity_new, modelname); // gender swapping boomers because that's hilarious
+   if (modelname[0] != 0) SetEntityModel(entity_new, modelname);
    
    TeleportEntity(entity_new,vOrigin,vAngles,vVelocity);
    SetEntProp(entity_new,Prop_Data,"m_iHealth",health);
@@ -424,6 +425,13 @@ int change_special_max(int ZOMBIECLASS, int new_max, bool draw = true)
     return 1;
 }
 
+// Fallen Survivor ignores damage from infected team to prevent physics abuse
+Action Fallen_OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3])
+{
+    if (IsValidClient(attacker) && GetClientTeam(attacker)==TEAM_INFECTED) return Plugin_Handled;
+    if (IsValidClient(inflictor) && GetClientTeam(inflictor)==TEAM_INFECTED) return Plugin_Handled;
+    return Plugin_Continue;
+}
 
 Action OnTakeDamageWitch(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3])
 {
