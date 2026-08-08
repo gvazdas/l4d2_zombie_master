@@ -212,6 +212,61 @@ void freeze_team(bool state = true, int team = TEAM_SURVIVOR)
     else if (team==TEAM_SURVIVOR && g_iLockedDoor==INVALID_ENT_REFERENCE) saferoom_locked=state;
 }
 
+// Check if ControlSI can be used on client
+stock bool IsSpecialBusy(const int client)
+{
+    if (zm_stage!=ZM_STARTED || !IsValidClient(client) || GetClientTeam(client)!=TEAM_INFECTED) return false;
+    if (g_fSpecialActivity[client]<0.0) return false;
+    float t = GetGameTime();
+    float dt_ability = FloatAbs(g_fSpecialActivity[client]-t);
+    if (dt_ability<1.0) return true;
+    int ability = L4D_GetPlayerCustomAbility(client);
+    if (ability<=MaxClients) ability = -1;
+    int weapon = GetEntPropEnt(client, Prop_Data, "m_hActiveWeapon");
+    if (weapon<=MaxClients) weapon = -1;
+    if (!IsValidEntity(ability) && !IsValidEntity(weapon)) return false;
+    if (IsValidEntity(weapon))
+    {
+        if (GetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack")>t) return true;
+    }
+    int zClass = GetEntProp(client, Prop_Send, "m_zombieClass");
+    switch (zClass)
+    {
+        case ZOMBIECLASS_SMOKER:
+        {
+            if (IsValidEntity(ability) && GetEntProp(ability, Prop_Send, "m_tongueState")>0) return true;
+        }
+        case ZOMBIECLASS_BOOMER:
+        {
+            if (IsValidEntity(ability) && GetEntProp(ability, Prop_Send, "m_isSpraying")>0) return true;
+        }
+        case ZOMBIECLASS_HUNTER:
+        {
+            if (IsValidEntity(ability) && GetEntProp(ability, Prop_Send, "m_isLunging")>0) return true;
+        }
+        case ZOMBIECLASS_SPITTER:
+        {
+            if (IsValidEntity(ability) && GetEntProp(ability, Prop_Send, "m_bHasBeenActivated")>0) return true;
+        }
+        case ZOMBIECLASS_JOCKEY:
+        {
+            if (IsValidEntity(ability) && GetEntProp(ability, Prop_Send, "m_isLeaping")>0) return true;
+        }
+        case ZOMBIECLASS_CHARGER:
+        {
+            if (IsValidEntity(ability) && GetEntProp(ability, Prop_Send, "m_isCharging")>0) return true;
+        }
+        case ZOMBIECLASS_TANK:
+        {
+            int m_nSequence = GetEntProp(client,Prop_Data,"m_nSequence");
+            if (m_nSequence>=49 && m_nSequence<=51) return true;
+            //if (GetEntProp(tankClaw, Prop_Send, "m_isLowAttack"))
+            //if (g_fSpecialActivity[client]>=0.0 && dt_ability<5.0) return true;
+        }
+    }
+    return false;
+}
+
 stock void transfer_SI_properties(int entity_new, char[] modelname, float vOrigin[3], float vAngles[3], float vVelocity[3],
         int health, int maxhealth, int fFlags, float timestamp_cooldown, char targetname[64] = "", float vomit_timestamp = -1.0, bool stagger = false)
 {

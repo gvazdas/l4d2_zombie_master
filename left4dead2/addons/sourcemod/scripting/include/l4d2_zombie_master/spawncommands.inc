@@ -1074,7 +1074,7 @@ int ZM_Spawn_SI(int client, int ZOMBIECLASS, bool free = false, bool setpos=fals
 
 	if (IsValidClient(bot))
 	{
-       	float angle[3];
+       	static float angle[3];
         get_random_xy_orientation(angle);
        	ChangeClientTeam(bot, TEAM_INFECTED);
        	SetEntProp(bot, Prop_Send, "m_usSolidFlags", 16);
@@ -1093,6 +1093,7 @@ int ZM_Spawn_SI(int client, int ZOMBIECLASS, bool free = false, bool setpos=fals
        	else SetEntProp(bot, Prop_Send, "movetype", 2);
        	if (!free) bank -= cost_SI;
 
+		g_fSpecialActivity[bot] = -1.0; // allow immediate ControlSI
        	request_crouch(EntIndexToEntRef(bot));
         RequestFrame(request_crouch,EntIndexToEntRef(bot));
 

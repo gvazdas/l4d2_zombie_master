@@ -311,6 +311,7 @@ float t_last_infected_model; // for zm_preview
 bool g_bLastWitchMoving = true;
 float t_finale_change; // track last finale stage change so they don't last more than 5 minutes each.
 int zm_kicked_userid = -1; // prevent ZM kicked by zm_kick from rejoining
+float g_fSpecialActivity[MAXPLAYERS+1]; // track special infected melee, ability gametime
 
 //Handle hTankLeaveStasis; // tank ambush
 
@@ -559,7 +560,7 @@ bool clients_offered[MAXPLAYERS+1] = {false,...}; // manual array in case steam 
 int color_blocked[4] = {255,0,0,128};
 int color_conditional[4] = {0,0,255,128};
 int color_allowed[4] = {0,255,0,128};
-int color_unit_select[4] = {255,255,255,128};
+int color_unit_select[4] = {255,255,255,255};
 
 float zm_target_pos[3], zm_spawner_pos[3], spawner_last_valid_pos[3];
 bool spawner_last_valid = false;
@@ -2131,7 +2132,7 @@ Action ZMControlSI(int client, int args)
             return Plugin_Continue;
         }
         
-        if ( L4D2_GetSurvivorVictim(zm_client)<=0 &&
+        if ( L4D2_GetSurvivorVictim(zm_client)<=0 && !IsSpecialBusy(zm_client) && 
              ( !ZM_finale_announced || zClass!=ZOMBIECLASS_TANK ) )
         {
             
@@ -2227,9 +2228,9 @@ Action ZMControlSI(int client, int args)
         return Plugin_Continue;
     }
     
-    char class[32];
+    static char class[32];
   	GetEntityClassname(entity, class, sizeof(class));
-  	if (strcmp(class,"player")==0 && L4D2_GetSurvivorVictim(entity)<=0 )
+  	if (strcmp(class,"player")==0 && L4D2_GetSurvivorVictim(entity)<=0 && !IsSpecialBusy(entity) )
   	{
          recordpos = true;
          float vOrigin[3], vAngles[3], vVelocity[3];

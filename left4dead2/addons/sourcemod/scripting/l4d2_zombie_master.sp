@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.38 2026-08-07"
+#define PLUGIN_VERSION 			"0.9.38a 2026-08-08"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -109,8 +109,9 @@ public Plugin myinfo =
 // 21. QueueFlowCommons -> reduce server lag
 // 22. Boomer-spawned Common Infected now respect gamerules.
 // 23. ZM glowing eyes.
-
-// FIX GRID CELLS VISIBLE
+// 24. SI busy checks.
+// 25. Added safe entity checks for witch and common infected
+// 26. Got rid of OnPlayerRunCmd prehook
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
@@ -677,6 +678,8 @@ void IsAllowed()
 
         HookEvent("spawner_give_item", EvtSurvivorInvOrWep, EventHookMode_Post);
         HookEvent("item_pickup", EvtSurvivorInvOrWep, EventHookMode_Post);
+
+        HookEvent("ability_use", EvtAbilityUse, EventHookMode_Post);
 		
 		load_zm_gamemode();
 		GetCvars();
@@ -758,6 +761,20 @@ void IsAllowed()
 		UnhookEvent("player_bot_replace", EvtBotReplacePlayer, EventHookMode_Post);
         UnhookEvent("bot_player_replace", EvtPlayerReplaceBot, EventHookMode_Post);
         UnhookEvent("player_shoved", Event_PlayerShoved, EventHookMode_Post);
+
+        UnhookEvent("upgrade_pack_used", EvtSurvivorInv, EventHookMode_Post);
+        UnhookEvent("defibrillator_used", EvtSurvivorInv, EventHookMode_Post);
+        UnhookEvent("adrenaline_used", EvtSurvivorInv, EventHookMode_Post);
+        
+        UnhookEvent("weapon_given", EvtSurvivorWep, EventHookMode_Post);
+        UnhookEvent("weapon_drop", EvtSurvivorWep, EventHookMode_Post);
+        UnhookEvent("weapon_drop_to_prop", EvtSurvivorWep, EventHookMode_Post);
+        UnhookEvent("weapon_pickup", EvtSurvivorWepNoCopy, EventHookMode_PostNoCopy);
+
+        UnhookEvent("spawner_give_item", EvtSurvivorInvOrWep, EventHookMode_Post);
+        UnhookEvent("item_pickup", EvtSurvivorInvOrWep, EventHookMode_Post);
+
+        UnhookEvent("ability_use", EvtAbilityUse, EventHookMode_Post);
 		
 		//if (g_hDTR_InputKill && !bypass_windows) g_hDTR_InputKill.Disable(Hook_Pre, DTR_CBaseEntity_InputKill);
 		//if (g_hDTR_InputKillHierarchy && !bypass_windows) g_hDTR_InputKillHierarchy.Disable(Hook_Pre, DTR_CBaseEntity_InputKillHierarchy);
@@ -2201,41 +2218,40 @@ public void OnMapEnd()
     CleanUpEyeGlow();
 }
 
-// this runs very frequently, find a better way.
-bool use_pressed, reload_pressed = false;
-public Action OnPlayerRunCmd(int client, int &buttons, int &impulse)
-{
-    if (!g_bCvarAllow || !IsValidClient(client)) return Plugin_Continue;
-	
-	if (g_fAbilityCooldown>=0.0 && IsPlayerAlive(client) && GetClientTeam(client)==TEAM_INFECTED)
-	{
-    	int ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
-    	if (IsValidEntity(ability))
-    	{
-        	float gametime = GetGameTime();
-        	float cooldown = GetEntPropFloat(ability,Prop_Send,"m_timestamp") - gametime;
-        	if (cooldown>g_fAbilityCooldown && cooldown<3000.0) SetEntPropFloat(ability,Prop_Send,"m_timestamp",gametime+g_fAbilityCooldown);
-    	}
-	}
-	
-	if (IsFakeClient(client)) return Plugin_Continue;
+bool use_pressed, reload_pressed;
 
-	if (buttons>0 || impulse>0)
+public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float vel[3], const float angles[3], int weapon, int subtype, int cmdnum, int tickcount, int seed, const int mouse[2])
+{
+    if (!g_bCvarAllow || !IsValidClient(client)) return;
+    bool alive = IsPlayerAlive(client);
+    if (alive && GetClientTeam(client)==TEAM_INFECTED)
+    {
+        if (buttons&IN_ATTACK>0 || buttons&IN_ATTACK2>0) g_fSpecialActivity[client] = GetGameTime();
+        if (g_fAbilityCooldown>=0.0)
+        {
+            int ability = GetEntPropEnt(client, Prop_Send, "m_customAbility");
+            if (ability>0 && IsValidEntity(ability))
+            {
+                float gametime = GetGameTime();
+                float cooldown = GetEntPropFloat(ability,Prop_Send,"m_timestamp") - gametime;
+                if (cooldown>g_fAbilityCooldown && cooldown<3000.0) SetEntPropFloat(ability,Prop_Send,"m_timestamp",gametime+g_fAbilityCooldown);
+            }
+        }
+    }
+    if (IsFakeClient(client)) return;
+    if (buttons>0 || impulse>0)
 	{
     	first_active = true;
     	set_client_active(null,client);
 	}
-	
-	if (client!=zm_client) return Plugin_Continue;
-	
-   	if (recordpos && IsPlayerAlive(zm_client)) // move this to controlSI and player_death
+    if (client!=zm_client) return;
+    if (recordpos && alive) // move this to controlSI and player_death
    	{
        	GetClientEyePosition(zm_client,zm_deathPos);
         GetClientEyeAngles(zm_client,zm_deathAngles);
    	}
    	update_ZM_looktarget(true);
-   	
-   	if (buttons&IN_USE>0)
+    if (buttons&IN_USE>0)
    	{
        	if (!use_pressed)
        	{
@@ -2245,7 +2261,6 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse)
        	}
    	}
    	else use_pressed = false;
-   	
    	if (buttons&IN_RELOAD>0)
    	{
        	if (!reload_pressed)
@@ -2256,10 +2271,14 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse)
        	}
    	}
    	else reload_pressed = false;
-   	
    	if (impulse==100) toggle_ZM_vision(client);
-        
-    if (zm_stage<ZM_STARTED && !zm_can_start && !force_started) buttons &= ~IN_ATTACK & ~IN_ATTACK2;
+}
+
+// Block ZM from attacking and using abilities before round start.
+public Action OnPlayerRunCmd(int client, int &buttons, int &impulse)
+{
+    if (!g_bCvarAllow || zm_stage>=ZM_STARTED || client!=zm_client) return Plugin_Continue;
+    if (!zm_can_start && !force_started) buttons &= ~IN_ATTACK & ~IN_ATTACK2;
 	return Plugin_Continue;	
 }
 
@@ -2519,46 +2538,47 @@ void Event_TriggeredCarAlarm(Event event, const char[] name, bool dontBroadcast)
 void evtPlayerSpawned(Event event, const char[] name, bool dontBroadcast)
 {
     if (!g_bCvarAllow) return;
-    
-   	   int client = GetClientOfUserId(event.GetInt("userid"));
-   	   if (DEBUG) LogMessage("[zm] evtPlayerSpawned %d", client);
-   	   dominated[client] = false;
-   	   if (clients_timer==INVALID_HANDLE) clients_timer = CreateTimer(0.1,CountClients);
-       if (zm_timer==INVALID_HANDLE) zm_update();
-   	   if (!IsPlayerAlive(client)) return;
-       request_update_glow(client);
-   	   if (GetClientTeam(client)==TEAM_SURVIVOR)
-   	   {
-       	   if (g_bLockSaferoom && L4D_IsInIntro()>0) freeze_player(client);
-       	   invalidate_survivor_cache(true);
-   	   }
-   	   else if (GetClientTeam(client)==TEAM_INFECTED)
-   	   {
-   	    int zClass = GetEntProp(client, Prop_Send, "m_zombieClass");
-	    if (zClass==ZOMBIECLASS_TANK)
-       	{
-           	if (g_hNoTanks.BoolValue)
-           	{
-               	ForcePlayerSuicide(client);
-               	return;
-           	}
-           	else if (pending_tank)
-           	{
-               	int health = GetEntProp(client,Prop_Data,"m_iHealth");
-               	if (DEBUG) LogMessage("[zm] Applied pending targetname and model %s %s", targetName_pending, model_pending);
-               	if (health>1) SetEntProp(client,Prop_Data,"m_iHealth",health-1); // prevent possible same-frame refund exploit
-               	DispatchKeyValue(client, "targetname", targetName_pending);
-               	SetEntProp(client,Prop_Data,"m_iMaxHealth", maxhp_pending);
-                ignore_threats[client] = ignore_threat_pending;
-               	if (model_pending[0]!=0)
-               	{
-                   	SetEntityModel(client, model_pending);
-                   	RequestFrame(NextFrame_SetModel,EntIndexToEntRef(client));
-               	}
-           	}
-       	}
-       	if (specials_frozen && IsFakeClient(client) && !ignore_threats[client]) freeze_player(client,true,TEAM_INFECTED);
-      }
+    int client = GetClientOfUserId(event.GetInt("userid"));
+    if (!IsValidClient(client)) return;
+    g_fSpecialActivity[client] = -1.0; // allow ControlSI
+    if (DEBUG) LogMessage("[zm] evtPlayerSpawned %d", client);
+    dominated[client] = false;
+    if (clients_timer==INVALID_HANDLE) clients_timer = CreateTimer(0.1,CountClients);
+    if (zm_timer==INVALID_HANDLE) zm_update();
+    if (!IsPlayerAlive(client)) return;
+    request_update_glow(client);
+    if (GetClientTeam(client)==TEAM_SURVIVOR)
+    {
+        if (g_bLockSaferoom && L4D_IsInIntro()>0) freeze_player(client);
+        invalidate_survivor_cache(true);
+    }
+    else if (GetClientTeam(client)==TEAM_INFECTED)
+    {
+    int zClass = GetEntProp(client, Prop_Send, "m_zombieClass");
+    if (zClass==ZOMBIECLASS_TANK)
+    {
+        if (g_hNoTanks.BoolValue)
+        {
+            ForcePlayerSuicide(client);
+            return;
+        }
+        else if (pending_tank)
+        {
+            int health = GetEntProp(client,Prop_Data,"m_iHealth");
+            if (DEBUG) LogMessage("[zm] Applied pending targetname and model %s %s", targetName_pending, model_pending);
+            if (health>1) SetEntProp(client,Prop_Data,"m_iHealth",health-1); // prevent possible same-frame refund exploit
+            DispatchKeyValue(client, "targetname", targetName_pending);
+            SetEntProp(client,Prop_Data,"m_iMaxHealth", maxhp_pending);
+            ignore_threats[client] = ignore_threat_pending;
+            if (model_pending[0]!=0)
+            {
+                SetEntityModel(client, model_pending);
+                RequestFrame(NextFrame_SetModel,EntIndexToEntRef(client));
+            }
+        }
+    }
+    if (specials_frozen && IsFakeClient(client) && !ignore_threats[client]) freeze_player(client,true,TEAM_INFECTED);
+    }
 }
 
 void EvtSurvivorInvOrWep(Event event, const char[] name, bool dontBroadcast)
@@ -2633,6 +2653,30 @@ void EvtPlayerHeal(Event event, const char[] name, bool dontBroadcast)
     survivor_items_changed(true,false);
 }
 
+void EvtAbilityUse(Event event, const char[] name, bool dontBroadcast)
+{
+	if (!g_bCvarAllow) return;
+	int client = GetClientOfUserId(event.GetInt("userid"));
+    if (!IsValidClient(client)) return;
+    //LogMessage("EvtAbilityUse %d", client);
+	g_fSpecialActivity[client] = GetGameTime();
+}
+
+public void L4D_TankRock_OnRelease_Post(int tank, int rock, const float vecPos[3], const float vecAng[3], const float vecVel[3], const float vecRot[3])
+{
+    if (!g_bCvarAllow) return;
+    if (!IsValidClient(tank)) return;
+    //LogMessage("TankRock_OnRelease_Post %d", tank);
+    g_fSpecialActivity[tank] = -1.0; // allow ControlSI
+}
+
+public Action L4D2_OnSelectTankAttack(int client, int &sequence)
+{
+    if (!g_bCvarAllow) return Plugin_Continue;
+    if (!IsValidClient(client)) return Plugin_Continue;
+	g_fSpecialActivity[client] = GetGameTime();
+}
+
 void evtPlayerTeam(Event event, const char[] name, bool dontBroadcast)
 {
 	if (!g_bCvarAllow) return;
@@ -2681,6 +2725,7 @@ public void OnClientPutInServer(int client)
 {
 	if(!g_bCvarAllow) return;
 	if (!IsValidClient(client)) return;
+    g_fSpecialActivity[client] = -1.0; // allow ControlSI
 	if (DEBUG) LogMessage("[zm] OnClientPutInServer %d", client);
     if (Trap_CountActive(ZM_TRAP_TYPE_TORNADO)>0) SDKHook(client, SDKHook_OnTakeDamage, TrapTornado_OnTakeDamage);
 	hp_timers[client] = null;

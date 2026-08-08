@@ -141,15 +141,14 @@ stock bool CreateEyeGlowOffsets(const int client, float dx = 0.0, float dy = 0.0
     int entity = -1;
     if (left_eye)
     {
-        entity = CreateParticle(PARTICLE_ZM_EYE,vLeft,vAngles,client,attachment);
-        if (IsValidEntity(entity)) iLeftEyeEntRef = EntIndexToEntRef(entity);
+        entity = CreateParticle(PARTICLE_ZM_EYE,vLeft,vAngles,client,attachment,zClass);
+        if (IsValidEntity(entity)) iLeftEyeEntRef = EntIndexToEntRef(entity); 
     }
     if (right_eye)
     {
-        entity = CreateParticle(PARTICLE_ZM_EYE,vRight,vAngles,client,attachment);
+        entity = CreateParticle(PARTICLE_ZM_EYE,vRight,vAngles,client,attachment,zClass);
         if (IsValidEntity(entity)) iRightEyeEntRef = EntIndexToEntRef(entity);
     }
-
     return true;
 }
 
@@ -161,15 +160,13 @@ stock void CleanUpEyeGlow()
     iRightEyeEntRef = INVALID_ENT_REFERENCE;
 }
 
-stock int CreateParticle(char[] particle, float vPos[3], float vAng[3], int target, const char[] attachment)
+stock int CreateParticle(const char[] particle, const float vPos[3], float vAng[3], const int target, const char[] attachment, const int zClass)
 {
     int entity = CreateEntityByName("info_particle_system");
     if (!IsEntitySafe(entity)) return -1;
-    DispatchKeyValue(entity, "targetname", "zm_eyes");
-    DispatchKeyValue(entity, "effect_name", particle);
     DispatchKeyValue(entity, "start_active", "1");
+    DispatchKeyValue(entity, "effect_name", particle);
     DispatchSpawn(entity);
-    ActivateEntity(entity);
     SetVariantString("!activator");
     AcceptEntityInput(entity, "SetParent", target);
     if (attachment[0] != 0)
@@ -178,6 +175,7 @@ stock int CreateParticle(char[] particle, float vPos[3], float vAng[3], int targ
         AcceptEntityInput(entity, "SetParentAttachment");
     }
     TeleportEntity(entity, vPos, vAng, NULL_VECTOR);
+    ActivateEntity(entity);
     static char g_sStopInput[50];
     static char g_sFireUser2Input[50];
     if (g_sStopInput[0]==0) FormatEx(g_sStopInput, sizeof(g_sStopInput), "OnUser1 !self:Stop::%.1f:-1", 5.0);
@@ -191,7 +189,26 @@ stock int CreateParticle(char[] particle, float vPos[3], float vAng[3], int targ
     AcceptEntityInput(entity, "AddOutput");
     SetVariantString("OnUser2 !self:FireUser1::0:-1");
     AcceptEntityInput(entity, "AddOutput");
-    SET_TRANSMIT_ALWAYS(target);
-    SET_TRANSMIT_ALWAYS(entity);
+    SetEdictFlags(entity, GetEdictFlags(entity)&(~FL_EDICT_ALWAYS) ); // allow settransmit hooks
+    if (zClass==ZOMBIECLASS_TANK && target==zm_client) SDKHook(entity, SDKHook_SetTransmit, OnTransmitEyeGlow);
     return entity;
 }
+
+// Hide eye glow for tank
+Action OnTransmitEyeGlow(int entity, int client)
+{
+    if (client==zm_client)
+    {
+        SetFlagsEye(entity);
+        return Plugin_Handled;
+    }
+    return Plugin_Continue;
+}
+
+void SetFlagsEye(int edict)
+{
+    if (GetEdictFlags(edict) & FL_EDICT_ALWAYS)
+    {
+        SetEdictFlags(edict, (GetEdictFlags(edict) ^ FL_EDICT_ALWAYS));
+    }
+} 
