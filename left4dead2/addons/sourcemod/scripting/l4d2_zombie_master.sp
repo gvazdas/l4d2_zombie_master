@@ -2809,7 +2809,7 @@ public void OnEntityDestroyed(int entity)
        	  {
       	     if (refund)
       	     {
-          	     if (IsValidEdict(entity) && g_iCostList[entity]>0) bank_refund = g_iCostList[entity];
+          	     if (IsValidEdict(entity) && g_iCostList[entity]>=0) bank_refund = g_iCostList[entity];
                  else bank_refund = calculate_infected_cost(GetEntProp(entity,Prop_Send,"m_Gender"));
                  add_available_zombie(ZOMBIECLASS_COMMON,1);
   	         }
@@ -2820,7 +2820,7 @@ public void OnEntityDestroyed(int entity)
        	     
              if (refund)
              {
-                if (IsValidEdict(entity) && g_iCostList[entity]>0)
+                if (IsValidEdict(entity) && g_iCostList[entity]>=0)
                 {
                     bank_refund = g_iCostList[entity];
                 }
