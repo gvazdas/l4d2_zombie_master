@@ -209,6 +209,7 @@ stock int Trap_Register(int type, int effect, int entity)
     g_Traps[slot].armedAt = GetGameTime();
     g_Traps[slot].roundcount = roundcount;
     bank -= cost;
+    if (IsValidClientZM()) update_t_zm_activity();
     return slot;
 }
 

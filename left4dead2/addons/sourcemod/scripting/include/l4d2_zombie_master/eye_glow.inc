@@ -31,12 +31,26 @@ stock void PrecacheParticle(const char[] particle)
     }
 }
 
-/** Console command for testing eye glow placement on Special Infected. */
+bool g_bDebugEye = false;
+
+/** Console command for testing eye glow on Special Infected. */
 Action ZM_Debug_Eye(int client, int args)
 {
    if (!IsValidClient(client)) return Plugin_Continue;
    int target = GetClientAimTarget(client,true);
-   if (!IsValidClient(target)) return Plugin_Continue;
+   if (!IsValidClient(target))
+   {
+        for (int i = 1; i <= MaxClients; i++)
+        {
+            if (i==client) continue;
+            if (!IsValidClient(i)) continue;
+            if (!IsPlayerAlive(i)) continue;
+            if (GetClientTeam(i)!=TEAM_INFECTED) continue;
+            target = i;
+            break;
+        }
+        if (!IsValidClient(target)) return Plugin_Continue;
+   }
    float dx,dy,dz;
    if (args>0)
    {
@@ -47,7 +61,8 @@ Action ZM_Debug_Eye(int client, int args)
             if (args>2) dz = GetCmdArgFloat(3);
         }
    }
-   CreateEyeGlowOffsets(target,dx,dy,dz);
+   bool state = CreateEyeGlowOffsets(target,dx,dy,dz);
+   if (state) g_bDebugEye = true; // do not delete eye glow no matter what
    return Plugin_Continue;
 }
 
@@ -59,6 +74,7 @@ stock void CreateEyeGlow(const int client)
 stock bool CreateEyeGlowOffsets(const int client, float dx = 0.0, float dy = 0.0, float dz = 0.0)
 {
     if (!IsValidClient(client) || GetClientTeam(client)!=TEAM_INFECTED) return false;
+    g_bDebugEye = false;
     CleanUpEyeGlow();
     int zClass = GetEntProp(client, Prop_Send, "m_zombieClass");
     static float vAngles[3], vLeft[3], vRight[3];
@@ -154,6 +170,7 @@ stock bool CreateEyeGlowOffsets(const int client, float dx = 0.0, float dy = 0.0
 
 stock void CleanUpEyeGlow()
 {
+    if (g_bDebugEye) return;
     if (IsValidEntRef(iLeftEyeEntRef)) AcceptEntityInput(iLeftEyeEntRef, "Kill");
     if (IsValidEntRef(iRightEyeEntRef)) AcceptEntityInput(iRightEyeEntRef, "Kill");
     iLeftEyeEntRef = INVALID_ENT_REFERENCE;

@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.38a 2026-08-08"
+#define PLUGIN_VERSION 			"0.9.38b 2026-08-09"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -112,6 +112,7 @@ public Plugin myinfo =
 // 24. SI busy checks.
 // 25. Added safe entity checks for witch and common infected
 // 26. Moved a lot of stuff to OnPlayerRunCmdPost
+// 27. Trap ZM activity
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
@@ -1863,6 +1864,7 @@ public Action evtPlayerDeath(Event event, const char[] name, bool dontBroadcast)
     // ZM controlling special infected has died
     if (victim==zm_client)
     {
+        CleanUpEyeGlow();
         if (panic_target==zm_client) panic_target = -1;
         DispatchKeyValue(zm_client, "targetname", "zm_client");
         SetEntityMoveType(zm_client, MOVETYPE_NONE);
