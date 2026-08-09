@@ -111,7 +111,7 @@ public Plugin myinfo =
 // 23. ZM glowing eyes.
 // 24. SI busy checks.
 // 25. Added safe entity checks for witch and common infected
-// 26. Got rid of OnPlayerRunCmd prehook
+// 26. Moved a lot of stuff to OnPlayerRunCmdPost
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?

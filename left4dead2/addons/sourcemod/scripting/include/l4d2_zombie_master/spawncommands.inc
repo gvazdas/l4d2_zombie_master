@@ -363,7 +363,7 @@ int ZM_Horde(
            else DispatchKeyValue(zombie, "targetname", "zm_unit_common");
            Spawner_NotifySpawned(zombie);
 		   SET_TRANSMIT_ALWAYS(zombie);
-		   g_iCostList[zombie] = temp_cost;
+		   g_iCostList[zombie] = free ? 0 : temp_cost;
 		    if (can_choir)
 			{
 				int i_random = GetRandomInt(0,sounds_choir.Length-1);
