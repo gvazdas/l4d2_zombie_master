@@ -7,7 +7,7 @@
 #include <left4dhooks>
 #include <l4d2_shoot_alert_common>
 
-#define PLUGIN_VERSION 		"2.18 2026-07-02"
+#define PLUGIN_VERSION 		"2.20 2026-08-10"
 public Plugin myinfo =
 {
 	name = "[L4D2] Weapon Fire Alert Common",
@@ -65,7 +65,7 @@ public void OnPluginStart()
     g_hCvarSaferoom.AddChangeHook(ConVarChanged_Cvars);
     
     g_hCvarBudget = CreateConVar("l4d2_shoot_alert_common_budget_ms", "5.0",
-    "CPU budget in ms for each alert. 0.0 to disable.",FCVAR_NOTIFY, true, 0.0, true, 1000.0);
+    "CPU budget in ms for each alert. Reduces server strain. 0.0 for infinite budget.",FCVAR_NOTIFY, true, 0.0, true, 1000.0);
     
     g_hCvarMPGameMode = FindConVar("mp_gamemode");
     g_hCvarMPGameMode.AddChangeHook(ConVarChanged_Gamemode);
@@ -126,10 +126,10 @@ public void OnEntityCreated(int entity, const char[] classname) // Check if this
 {
 	if (!enabled || !map_started || finale || survival || !IsValidEdict(entity)) return;
 	ignore[entity] = true; // ignore alerts from before zombie spawned
-	if (entity>MaxClients && strncmp(classname,"infected",8,false)==0 && GetEntProp(entity,Prop_Send,"m_mobRush")<=0)
-	{
-       	CreateTimer(weapon_fire_hooked ? 1.51 : 0.1,check_aggro,EntIndexToEntRef(entity),TIMER_FLAG_NO_MAPCHANGE); // prevent zombie from alerting retroactively
-	}
+    if (entity<=MaxClients) return;
+    if (strcmp(classname,"infected",false)!=0) return;
+	if (GetEntProp(entity,Prop_Send,"m_mobRush")>0) return; // can't check gender and hp yet
+    CreateTimer(weapon_fire_hooked ? 1.51 : 0.1,check_aggro,EntIndexToEntRef(entity),TIMER_FLAG_NO_MAPCHANGE); // prevent zombie from alerting retroactively
 }
 
 public void L4D2_Infected_HitByVomitJar_Post(int victim, int attacker)
@@ -194,7 +194,7 @@ public void L4D_PipeBomb_Detonate_Post(int entity, int client)
     if (!weapon_fire_hooked) return;
     static char class[32];
     GetEntityClassname(entity,class,sizeof(class)); 
-    if (strncmp(class,"pipe_bomb_projectile",20,false)!=0) return; // bug noted in l4dhooks documentation
+    if (strcmp(class,"pipe_bomb_projectile",false)!=0) return; // bug noted in l4dhooks documentation
     #if DEBUG 
     LogMessage("%d detonated %s %d", client, class, entity);
     #endif
@@ -222,6 +222,13 @@ public void OnMapEnd()
     map_started = false;
     if (enabled) ignore_all();
     if (weapon_fire_hooked) check_hooks(HOOKS_FORCE_OFF);
+}
+
+public void OnPluginEnd()
+{
+    enabled = false;
+    reset_timers();
+    check_hooks(HOOKS_FORCE_OFF);
 }
 
 public void L4D2_OnSavingEntities_Post(int info_changelevel)

@@ -14,6 +14,19 @@
  */
 native void L4D2_Infected_Alert_Constructor(int entity = -1, int client = -1, float multiplier = 1.0, bool force = false, float pos[3] = {0.0,0.0,0.0});
 
+public SharedPlugin __pl_l4d2_shoot_alert_common =
+{
+    name     = "l4d2_shoot_alert_common",
+    file     = "l4d2_shoot_alert_common.smx",
+};
+
+#if !defined REQUIRE_PLUGIN
+public void __pl_l4d2_shoot_alert_common_SetNTVOptional()
+{
+    MarkNativeAsOptional("L4D2_Infected_Alert_Constructor");
+}
+#endif
+
 #if defined _NATIVE_ONLY
  #endinput
 #endif
@@ -76,9 +89,10 @@ bool enabled, speech, accumulate, saferoom = false;
 float alert_range, rush_range, alert_probability, alert_memory, LOS_multiplier, voice_multiplier;
 int alert_max;
 
+// Execute plugin .cfg to reset all cvars to default values.
 Action request_reset(int client, int args)
 {
-    char command[PLATFORM_MAX_PATH];
+    static char command[PLATFORM_MAX_PATH];
     Format(command, sizeof(command), "exec sourcemod/%s", CONFIG_FILENAME);
     ServerCommand(command);
     return Plugin_Stop;
@@ -138,18 +152,26 @@ void MapStarted()
     if (enabled) late_enable();
 }
 
+stock bool ShouldHook()
+{
+    if (!enabled) return false;
+    if (!map_started) return false;
+    if (finale) return false;
+    if (survival) return false;
+    if (!L4D_HasMapStarted()) return false;
+    if (L4D_IsInIntro()>0) return false;
+    if (!saferoom && !L4D_HasAnySurvivorLeftSafeArea()) return false;
+    if (get_commons()<=0) return false;
+    return true;
+}
+
 void check_hooks(int state = HOOKS_AUTO) // Dynamically hook/unhook weapon_fire and NormalSoundHook for performance.
 {
     timer_hook = null;
     bool should_hook;
     switch (state)
     {
-        case HOOKS_AUTO:
-        {
-            should_hook = enabled && map_started && !finale && !survival;
-            if (should_hook)
-                should_hook = should_hook && L4D_HasMapStarted() && L4D_IsInIntro()<=0 && (saferoom || L4D_HasAnySurvivorLeftSafeArea()) && get_commons()>0;
-        }
+        case HOOKS_AUTO: should_hook = ShouldHook();
         case HOOKS_FORCE_OFF: should_hook = false;
         case HOOKS_FORCE_ON: should_hook = enabled;
     }
@@ -239,7 +261,7 @@ Action SurvivorSpeak(int clients[MAXPLAYERS], int &numClients, char sample[PLATF
                      int &entity, int &channel, float &volume, int &level, int &pitch, int &flags,
                      char soundEntry[PLATFORM_MAX_PATH], int &seed) // Survivor said something.
 {
-    if (channel!=SNDCHAN_VOICE || volume<=0.1 || sample[0]!='p' || !IsValidAliveSurvivor(entity) || spoken[entity]) return Plugin_Continue;
+    if (channel!=SNDCHAN_VOICE || volume<=0.1 || CharToLower(sample[0])!='p' || !IsValidAliveSurvivor(entity) || spoken[entity]) return Plugin_Continue;
     if (strncmp(sample[16],"voice",5)!=0 || strncmp(sample[7],"survivor",8)!=0) return Plugin_Continue;
     spoken[entity] = true;
     RequestFrame(Reset_Spoken,entity);
@@ -251,7 +273,7 @@ Action SurvivorSpeak(int clients[MAXPLAYERS], int &numClients, char sample[PLATF
     return Plugin_Continue;
 }
 
-void Reset_Spoken(int client) // Reduce NormalSoundHook spam
+void Reset_Spoken(const int client) // Reduce NormalSoundHook spam
 {
     spoken[client] = false;
 }
@@ -339,7 +361,7 @@ Action alert_response(Handle timer, DataPack pack) // Delayed alert nearby infec
         #endif
     }
     if (g_bLocal) g_iClientNearby = client_final;
-    else g_iClientNearby = (result_nearest>0) ? result_nearest : NearestAliveSurvivor(g_fPos,max_range);
+    else g_iClientNearby = result_nearest>0 ? result_nearest : NearestAliveSurvivor(g_fPos,max_range);
     if (enumerate_new && l4dhooks_updated) EnumerateInfectedWithin(g_fPos,max_range,client_final);
     else TR_EnumerateEntitiesSphere(g_fPos,max_range,PARTITION_NON_STATIC_EDICTS,AlertCallback_Sphere,client_final);
     #if DEBUG
@@ -407,12 +429,8 @@ bool AlertCallback(int entity, int client) // Return true to continue enumeratin
         return true;
     }
     static float pos[3]; // infected position
-    if (!GetEntityAttachment(entity,1,pos,{0.0,0.0,0.0})) // infected head position
-    {
-        GetEntPropVector(entity,Prop_Send,"m_vecOrigin",pos); // infected position
-        pos[2] += 60.0; // move to infected head position
-    }
-    #if DEBUG
+    GetInfectedEyePos(entity,pos);
+    #if DEBUG>1
         if (!IsFakeClient(client)) // Draw trace ray path
         {
             TE_SetupBeamPoints(g_fPos,pos,g_iLaser,0,0,0,3.0,1.5,0.0,1,0.0,{100,100,100,255},0);
@@ -465,6 +483,30 @@ bool AlertCallback(int entity, int client) // Return true to continue enumeratin
     return true;
 }
 
+stock void GetInfectedEyePos(const int entity, float pos[3])
+{
+    // alternative: ValveBiped.Bip01_Head1 ValveBiped.Exp_Eyelids_Upper 
+    //if (!GetEntityAttachment(entity,1,pos,{0.0,0.0,0.0})) // infected head position
+    if (GetAttachmentVectors(entity,"forward",pos,{0.0,0.0,0.0}))
+    {
+        pos[2] += 1.0;
+        return;
+    }
+    #if DEBUG
+    LogMessage("failed to find attachment forward");
+    #endif
+    if (GetAttachmentVectors(entity,"Mouth",pos,{0.0,0.0,0.0}))
+    {
+        pos[2] += 3.0;
+        return;
+    }
+    #if DEBUG
+    LogMessage("failed to find attachment Mouth");
+    #endif
+    GetEntPropVector(entity,Prop_Send,"m_vecOrigin",pos); // infected position
+    pos[2] += 60.0; // infected head position
+}
+
 // infected: rush client, or if alert is not local, rush client nearest to alert.
 void infected_rush_client(const int infected, const int client, int client_nearest = -1, bool local = true)
 {
@@ -504,6 +546,7 @@ Action refresh_rush_client(Handle timer, DataPack pack)
     int client = EntRefToEntIndex(entref_client);
     if (!IsValidAliveSurvivor(client)) return Plugin_Stop;
     int infected = EntRefToEntIndex(entref_zombie);
+    if (!IsValidEntity(infected)) return Plugin_Stop;
     L4D2_CommandABot(infected,client,BOT_CMD_ATTACK);
     #if DEBUG>1
     LogMessage("L4D2_CommandABot %d %d BOT_CMD_ATTACK", infected, client);
@@ -713,7 +756,7 @@ stock bool is_infected(int infected)
 {
     static char class[16];
     GetEntityClassname(infected,class,sizeof(class));
-    return strncmp(class,"infected",8,false)==0;
+    return strcmp(class,"infected",false)==0;
 }
 
 stock bool is_bad_infected(int infected) // both props change dynamically and need to be monitored.
@@ -753,11 +796,11 @@ stock bool FilterLOS(int entity, int mask, int self = -1)
 	{
     	case 'i':
     	{
-        	if (strncmp(class,"infected",8,false)==0) return false;
+        	if (strcmp(class,"infected",false)==0) return false;
     	}
     	case 'w':
     	{
-        	if (strncmp(class,"witch",5,false)==0) return false;
+        	if (strcmp(class,"witch",false)==0) return false;
     	}
     	case 'e':
     	{
