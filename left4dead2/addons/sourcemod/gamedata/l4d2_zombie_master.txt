@@ -214,6 +214,13 @@
 				"linux"			"45"
 				"mac"			"45"
 		    }
+
+			// From left4dhooks thanks to Silvers
+			"m_iTankCount"
+			{
+				"linux"			"448"
+				"windows"		"448"
+			}
              
         }
 		

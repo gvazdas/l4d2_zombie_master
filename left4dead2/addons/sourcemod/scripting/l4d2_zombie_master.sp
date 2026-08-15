@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.38b 2026-08-09"
+#define PLUGIN_VERSION 			"0.9.38d 2026-08-14"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -68,6 +68,7 @@ bool DEBUG = false;
 #include <l4d2_zombie_master/traps/trap_tornado>
 #include <l4d2_zombie_master/survivor_inventory>
 #include <l4d2_zombie_master/eye_glow>
+#include <l4d2_zombie_master/finale>
 
 #undef REQUIRE_PLUGIN
 #include <adminmenu>
@@ -113,6 +114,7 @@ public Plugin myinfo =
 // 25. Added safe entity checks for witch and common infected
 // 26. Moved a lot of stuff to OnPlayerRunCmdPost
 // 27. Trap ZM activity
+// 28. Finale bot->ZM ZM->bot stage fix
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
@@ -1196,6 +1198,7 @@ Action zm_new_round(Handle timer = null)
         GridLib_StartPrecomputation();
     }
     Spawner_Init();
+    Reset_TankOffer();
     ZM_Vision_Cleanup();
     if (g_CellCooldown) g_CellCooldown.Clear();
     cellcache_clear_all();
@@ -1335,10 +1338,10 @@ Action zm_new_round(Handle timer = null)
 	//scope_changed = false;
 	survival_activated = false;
 	
-	targetName_pending = "";
-	model_pending = "";
-	pending_tank = false;
-    ignore_threat_pending = false;
+	//targetName_pending = "";
+	//model_pending = "";
+	//pending_tank = false;
+    //ignore_threat_pending = false;
 	
 	if (fq_timer==INVALID_HANDLE) fq_timer = CreateTimer(1.0,fair_queue_update);
 	
@@ -1429,10 +1432,10 @@ Action CountClients(Handle timer = null)
 	
 	if (live_zombie_arr[ZOMBIECLASS_TANK]<=0)
 	{
-    	targetName_pending = "";
-    	pending_tank = false;
-    	model_pending = "";
-        ignore_threat_pending = false;
+    	//targetName_pending = "";
+    	//pending_tank = false;
+    	//model_pending = "";
+        //ignore_threat_pending = false;
     	if (first_tank_stage==FIRST_TANK_SPAWNED) first_tank_stage = FIRST_TANK_DEAD;
 	}
 
@@ -1691,9 +1694,9 @@ public void L4D_OnEnterGhostState(int client)
 
 public Action L4D_OnTryOfferingTankBot(int tank_index, bool &enterStasis)
 {
-	if (!g_bCvarAllow) return Plugin_Continue;
-	if (DEBUG) LogMessage("[zm] L4D_OnTryOfferingTankBot %d %d", tank_index, enterStasis);
-	return Plugin_Handled;
+    if (!g_bCvarAllow) return Plugin_Continue;
+    if (DEBUG) LogMessage("[zm] L4D_OnTryOfferingTankBot %d %d", tank_index, enterStasis);
+    return Plugin_Handled;
 }
 
 public Action OnClientSayCommand(int client, const char[] command, const char[] sArgs)
@@ -2556,30 +2559,30 @@ void evtPlayerSpawned(Event event, const char[] name, bool dontBroadcast)
     }
     else if (GetClientTeam(client)==TEAM_INFECTED)
     {
-    int zClass = GetEntProp(client, Prop_Send, "m_zombieClass");
-    if (zClass==ZOMBIECLASS_TANK)
-    {
-        if (g_hNoTanks.BoolValue)
+        int zClass = GetEntProp(client, Prop_Send, "m_zombieClass");
+        if (zClass==ZOMBIECLASS_TANK)
         {
-            ForcePlayerSuicide(client);
-            return;
-        }
-        else if (pending_tank)
-        {
-            int health = GetEntProp(client,Prop_Data,"m_iHealth");
-            if (DEBUG) LogMessage("[zm] Applied pending targetname and model %s %s", targetName_pending, model_pending);
-            if (health>1) SetEntProp(client,Prop_Data,"m_iHealth",health-1); // prevent possible same-frame refund exploit
-            DispatchKeyValue(client, "targetname", targetName_pending);
-            SetEntProp(client,Prop_Data,"m_iMaxHealth", maxhp_pending);
-            ignore_threats[client] = ignore_threat_pending;
-            if (model_pending[0]!=0)
+            if (g_hNoTanks.BoolValue)
             {
-                SetEntityModel(client, model_pending);
-                RequestFrame(NextFrame_SetModel,EntIndexToEntRef(client));
+                ForcePlayerSuicide(client);
+                return;
             }
+            // else if (pending_tank)
+            // {
+            //     int health = GetEntProp(client,Prop_Data,"m_iHealth");
+            //     if (DEBUG) LogMessage("[zm] Applied pending targetname and model %s %s", targetName_pending, model_pending);
+            //     if (health>1) SetEntProp(client,Prop_Data,"m_iHealth",health-1); // prevent possible same-frame refund exploit
+            //     DispatchKeyValue(client, "targetname", targetName_pending);
+            //     SetEntProp(client,Prop_Data,"m_iMaxHealth", maxhp_pending);
+            //     ignore_threats[client] = ignore_threat_pending;
+            //     if (model_pending[0]!=0)
+            //     {
+            //         SetEntityModel(client, model_pending);
+            //         RequestFrame(NextFrame_SetModel,EntIndexToEntRef(client));
+            //     }
+            // }
         }
-    }
-    if (specials_frozen && IsFakeClient(client) && !ignore_threats[client]) freeze_player(client,true,TEAM_INFECTED);
+        if (specials_frozen && IsFakeClient(client) && !ignore_threats[client]) freeze_player(client,true,TEAM_INFECTED);
     }
 }
 

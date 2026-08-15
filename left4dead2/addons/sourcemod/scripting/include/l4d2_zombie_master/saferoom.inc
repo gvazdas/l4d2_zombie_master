@@ -581,6 +581,7 @@ Action Timer_StartPrecomputeNav(Handle timer)
 	if (DEBUG) LogMessage("[zm] Starting navmesh precomputation...");
 	float startTime = GetEngineTime(); // for profiling
     g_bNavReady = false;
+    if (L4D_IsSurvivalMode()) return Plugin_Stop;
 
     Address temp_navArea;
     static float vector_start[3];

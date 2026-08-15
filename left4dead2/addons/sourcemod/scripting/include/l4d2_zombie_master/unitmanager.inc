@@ -7,26 +7,25 @@
 
 // TANK BULLSHIT
 
-// Tank model consistency
-void NextFrame_SetModel(int entref)
-{
-    if (!IsValidEntRef(entref)) return;
-    if (model_pending[0]==0) return;
-    SetEntityModel(entref, model_pending);
-    pending_tank = false;
-}
+// // Tank model consistency
+// void NextFrame_SetModel(int entref)
+// {
+//     if (!IsValidEntRef(entref)) return;
+//     if (model_pending[0]==0) return;
+//     SetEntityModel(entref, model_pending);
+// }
 
-Action Timer_Clear_targetname_pending(Handle timer = null)
-{
-    if (pending_tank)
-    {
-        targetName_pending = "";
-        pending_tank = false;
-        model_pending = "";
-        LogMessage("[zm] unexpectedly cleared targetName_pending. Report to mod authors.");
-    }
-    return Plugin_Stop;
-}
+// Action Timer_Clear_targetname_pending(Handle timer = null)
+// {
+//     if (pending_tank)
+//     {
+//         targetName_pending = "";
+//         pending_tank = false;
+//         model_pending = "";
+//         LogMessage("[zm] unexpectedly cleared targetName_pending. Report to mod authors.");
+//     }
+//     return Plugin_Stop;
+// }
 
 float t_stutter = 0.0;
 bool verify_stutter_fixed()
@@ -216,6 +215,12 @@ void freeze_team(bool state = true, int team = TEAM_SURVIVOR)
 stock bool IsSpecialBusy(const int client)
 {
     if (zm_stage!=ZM_STARTED || !IsValidClient(client) || GetClientTeam(client)!=TEAM_INFECTED) return false;
+    int zClass = GetEntProp(client, Prop_Send, "m_zombieClass");
+    if (zClass==ZOMBIECLASS_TANK)
+    {
+        // prevent Tank stuck while climbing
+        if (client!=zm_client && (GetEntityFlags(client)&FL_ONGROUND)<=0 && GetEntityMoveType(client)!=MOVETYPE_LADDER) return true;
+    }
     if (g_fSpecialActivity[client]<0.0) return false;
     float t = GetGameTime();
     float dt_ability = FloatAbs(g_fSpecialActivity[client]-t);
@@ -229,7 +234,6 @@ stock bool IsSpecialBusy(const int client)
     {
         if (GetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack")>t) return true;
     }
-    int zClass = GetEntProp(client, Prop_Send, "m_zombieClass");
     switch (zClass)
     {
         case ZOMBIECLASS_SMOKER:
@@ -259,7 +263,7 @@ stock bool IsSpecialBusy(const int client)
         case ZOMBIECLASS_TANK:
         {
             int m_nSequence = GetEntProp(client,Prop_Data,"m_nSequence");
-            if (m_nSequence>=49 && m_nSequence<=51) return true;
+            if (m_nSequence>=49 && m_nSequence<=51) return true; // throwing rock
             //if (GetEntProp(tankClaw, Prop_Send, "m_isLowAttack"))
             //if (g_fSpecialActivity[client]>=0.0 && dt_ability<5.0) return true;
         }

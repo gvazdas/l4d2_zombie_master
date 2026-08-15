@@ -100,6 +100,11 @@ stock bool CreateEyeGlowOffsets(const int client, float dx = 0.0, float dy = 0.0
                 vLeft = view_as<float>({ 0.0, 1.34, 2.84 });
                 right_eye = false;
                 attachment = "mouth";
+
+                // try ValveBiped.Bip01_Head1
+                // try ValveBiped.Bip01_Neck0
+                //vLeft = view_as<float>({ 0.0, 0.0, 0.0});
+                //attachment = "ValveBiped.Bip01_Head1";
             }
             else if (StrContains(sModelName,"boomette",false)>=0) // Boomette
             {
@@ -146,6 +151,13 @@ stock bool CreateEyeGlowOffsets(const int client, float dx = 0.0, float dy = 0.0
             vLeft = view_as<float>({ 1.4, 4.3, 1.4 });
             vRight = view_as<float>({ -1.5, 4.3, 1.5 });
             attachment = "mouth";
+
+            //attachment = "ValveBiped.Bip01_Neck0";
+            //vLeft = view_as<float>({ 0.0, 0.0, 0.0 });
+            //vRight = view_as<float>({ 0.0, 0.0, 0.0 });
+            // try ValveBiped.Bip01_Neck0
+            // try ValveBiped.Bip01_Spine3
+            // try ValveBiped.Bip01_Head
         }
         default: return false;
     }

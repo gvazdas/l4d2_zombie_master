@@ -11,8 +11,6 @@ void SetCvarsZM()
    if (!g_bCvarAllow) return;
    
    if (DEBUG) LogMessage("[zm] SetCvarsZM");
-   
-   SetConVarInt(FindConVar("director_tank_lottery_selection_time"), 9999);
    SetConVarInt(FindConVar("tank_stuck_time_suicide"), 0);
    SetConVarInt(FindConVar("z_frustration"), 0);
    SetConVarInt(FindConVar("tank_stuck_failsafe"), 0);

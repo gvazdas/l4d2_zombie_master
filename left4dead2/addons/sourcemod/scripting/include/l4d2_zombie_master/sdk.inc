@@ -58,6 +58,9 @@ void GetGameData()
 void PrepSDKCall()
 {
 
+	g_iOffs_m_iTankCount = hGameData.GetOffset(OFFSET_TANKCOUNT);
+	if (g_iOffs_m_iTankCount == -1) SetFailState("Missing offset \""...OFFSET_TANKCOUNT..."\"");
+	
 	StartPrepSDKCall(SDKCall_Player);
 
 	//find create bot signature

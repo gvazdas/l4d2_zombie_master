@@ -784,7 +784,7 @@ void delete_all_infected(bool common=true, bool witch=true, bool special=true)
 			if (delete_special_blocked(i)) continue;
 			if ( (ZM_finale_announced || L4D_IsSurvivalMode()) && GetEntProp(i, Prop_Send, "m_zombieClass")==ZOMBIECLASS_TANK )
             {
-				char targetName[8];
+				static char targetName[16];
 				GetEntPropString(i, Prop_Data, "m_iName", targetName, sizeof(targetName));
 				if (strcmp(targetName,"zm_unit")!=0) continue;
             }
@@ -900,7 +900,7 @@ void zm_del_pointing(int client)
 		   if ( (ZM_finale_announced || L4D_IsSurvivalMode()) &&
                GetEntProp(target, Prop_Send, "m_zombieClass")==ZOMBIECLASS_TANK )
            {
-               char targetName[16];
+               static char targetName[16];
                GetEntPropString(target, Prop_Data, "m_iName", targetName, sizeof(targetName));
                if (strcmp(targetName,"zm_unit")!=0) group = -1;
            }
@@ -1147,6 +1147,8 @@ int ZM_Spawn_SI(int client, int ZOMBIECLASS, bool free = false, bool setpos=fals
             SetEntPropFloat(bot,Prop_Send,"m_flModelScale",GetRandomFloat(0.5,2.0));
             ChangeEdictState(bot);
         }
+
+		RequestFrame(Check_Stuck,bot);
 
 	}
 	else update_hint("%T", "Spawn failed", zm_client);
