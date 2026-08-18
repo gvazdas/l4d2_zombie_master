@@ -46,6 +46,7 @@ void update_hint_spawner(int spawner_state, int zClass = ZOMBIECLASS_COMMON)
 bool Spawner_Can_Spawn(int client)
 {
     if (!zm_allow_spawns) return false;
+    if (ZM_finale_announced && L4D2_GetCurrentFinaleStage()==FINALE_CUSTOM_DELAY) return false;
     if (client>0 && client!=zm_client) return false; // allow only server or zm client to spawn zombies.
     //if (g_iSpawnerMode<2 && client==zm_client)
     //{
@@ -73,7 +74,6 @@ void Spawner_Update()
 int Spawner_ResolveCommonPositions(int count, bool flow, bool angry, bool hint,
     float[] outPositions, int maxOut)
 {
-    if (!Spawner_Can_Spawn(-1)) return 0;
     if (hint && IsValidClientZM()) update_spawner_zombieclass(ZOMBIECLASS_COMMON,!flow);
     switch (g_iSpawnerMode)
     {
@@ -87,7 +87,6 @@ int Spawner_ResolveCommonPositions(int count, bool flow, bool angry, bool hint,
 /** Resolve one position for a witch. Returns false if no valid position found. */
 bool Spawner_ResolveWitchPosition(bool flow, float outPos[3])
 {
-    if (!Spawner_Can_Spawn(-1)) return false;
     if (IsValidClientZM()) update_spawner_zombieclass(ZOMBIECLASS_WITCH,!flow);
     switch (g_iSpawnerMode)
     {
@@ -99,7 +98,6 @@ bool Spawner_ResolveWitchPosition(bool flow, float outPos[3])
 /** Resolve one position for a special infected. Returns false if no valid position found. */
 bool Spawner_ResolveSpecialPosition(int zombieclass, bool flow, float outPos[3])
 {
-    if (!Spawner_Can_Spawn(-1)) return false;
     if (IsValidClientZM()) update_spawner_zombieclass(zombieclass,!flow);
     switch (g_iSpawnerMode)
     {

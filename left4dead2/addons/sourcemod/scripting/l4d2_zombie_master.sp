@@ -34,7 +34,7 @@
 bool DEBUG = false;
 
 #define PLUGIN_NAME			    "l4d2_zombie_master"
-#define PLUGIN_VERSION 			"0.9.38d 2026-08-14"
+#define PLUGIN_VERSION 			"0.9.38h 2026-08-18"
 #define GAMEDATA_FILE           PLUGIN_NAME
 #define CONFIG_FILENAME         PLUGIN_NAME
 
@@ -114,7 +114,7 @@ public Plugin myinfo =
 // 25. Added safe entity checks for witch and common infected
 // 26. Moved a lot of stuff to OnPlayerRunCmdPost
 // 27. Trap ZM activity
-// 28. Finale bot->ZM ZM->bot stage fix
+// 28. Finale bot->ZM Tank skip stage fix
 
 // TO DO LIST:
 // 16. Is there a way to prevent observers from being able to see the ZM info? Try SendProxy?
@@ -172,7 +172,7 @@ public void OnPluginStart()
 	RegConsoleCmd("zm_followme", ZM_Chase_ZM, "Panic horde will chase Zombie Master.");
 	RegConsoleCmd("zm_vision", ZM_Vision, "Toggle night vision for ZM. Or press the flashlight button.");
 	RegConsoleCmd("zm_teleport", ZMTeleport, "ZM will teleport to farthest flow survivor.");
-	RegConsoleCmd("zm_control", ZMControlSI, "ZM will take control of the special infected that is flashing. Or press the USE button.");
+	RegConsoleCmd("zm_control", ZMControlSI_Command, "ZM will take control of the special infected that is flashing. Or press the USE button.");
 	RegConsoleCmd("zm_menu", ZM_Menu, "Open specific ZM menu: main common uncommon special boss cleanup other close. Use the RELOAD button to open the main menu.");
 	RegConsoleCmd("zm_help", ZM_MOTD, "Open console tutorial which explains how to play Zombie Master.");
 	RegConsoleCmd("zm_tutorial", ZM_MOTD, "Open console tutorial which explains how to play Zombie Master.");
@@ -1511,7 +1511,7 @@ public Action L4D_OnGetScriptValueInt(const char[] key, int &retVal)
                 retVal = 1;
                	return Plugin_Handled;
         	}
-        	if (strcmp(key, "cm_ShouldHurry", false) == 0)
+        	if (strcmp(key, "cm_ShouldHurry", false) == 0) // makes survivors more competent
         	{
                	retVal = 1;
                	return Plugin_Handled;
@@ -1779,20 +1779,13 @@ public void L4D_OnIncapacitated_Post(int client, int inflictor, int attacker, fl
 
 public Action evtPlayerDeath(Event event, const char[] name, bool dontBroadcast)
 {
-    
     if (!g_bCvarAllow) return Plugin_Continue;
-    
-    // Skip victims that are not infected entities
     int victim = GetClientOfUserId(event.GetInt("userid"));
-    int health = GetEntProp(victim,Prop_Data,"m_iHealth");
     if (!IsValidClient(victim)) return Plugin_Continue;
     dominated[victim] = false;
-    
     if (clients_timer==INVALID_HANDLE) clients_timer = CreateTimer(0.1,CountClients);
-    
     request_update_glow(victim,true,0.0); 
     static char sound[PLATFORM_MAX_PATH];
-    
     if(GetClientTeam(victim)!=TEAM_INFECTED)
     {
         if (GetClientTeam(victim)==TEAM_SURVIVOR)
@@ -1824,7 +1817,7 @@ public Action evtPlayerDeath(Event event, const char[] name, bool dontBroadcast)
         return Plugin_Continue;
     }
     
-    char targetName[20];
+    static char targetName[32];
     GetEntPropString(victim, Prop_Data, "m_iName", targetName, sizeof(targetName));
     
     if (active_looktarget && entref_control==EntIndexToEntRef(victim))
@@ -1835,33 +1828,31 @@ public Action evtPlayerDeath(Event event, const char[] name, bool dontBroadcast)
     }
     
     int zClass = GetEntProp(victim, Prop_Send, "m_zombieClass");
-    
+    int health = GetEntProp(victim,Prop_Data,"m_iHealth");
     if (DEBUG) LogMessage("[zm] evtPlayerDeath %d %d %s, %d HP", victim, zClass, targetName, health);
+
+    bool dispatch_dead = false; // set targetname to zm_unit_dead?
     
-     // survival: every non-ZM tank death gives ZM bank
+    // survival: every non-ZM tank death gives ZM bank
     if (zClass==ZOMBIECLASS_TANK && L4D_IsSurvivalMode())
     {
-        
-        if (strcmp(targetName,"zm_unit")!=0 && strcmp(targetName,"zm_unit_control")!=0
-             && strcmp(targetName,"zm_unit_dead")!=0 && strcmp(targetName,"zm_control_dead")!=0 )
+        if (strncmp(targetName,"zm_unit",7,false)!=0 && strcmp(targetName,"zm_control_dead",false)!=0)
         {
             if (DEBUG) LogMessage("[zm] Survival non-ZM tank died");
             bank += g_iBonusSurvival*g_iAliveSurvivors;
+            dispatch_dead = true;
             update_hint("%T", "Tank died reward", zm_client);
             if (IsValidClientZM()) EmitSoundToClient(zm_client,SOUND_REWARD);
         }
     }
     
     // Begin availability countdown.
-    // Set targetname to something indicating countdown has started to avoid double countdown
     if (strcmp(targetName,"zm_unit")==0 || strcmp(targetName,"zm_unit_control")==0)
     {
-        DispatchKeyValue(victim, "targetname", "zm_unit_dead");
+        dispatch_dead = true;
         create_timer_add_available_zombie(get_class_cooldown(zClass),zClass,roundcount);
-        
         if (zClass==ZOMBIECLASS_TANK && first_tank_stage==FIRST_TANK_SPAWNED)
             first_tank_stage = FIRST_TANK_DEAD;
-        
     }
 
     // ZM controlling special infected has died
@@ -1880,6 +1871,7 @@ public Action evtPlayerDeath(Event event, const char[] name, bool dontBroadcast)
         }
         CreateTimer(0.1,ZM_Delayed_Cry,sound,TIMER_FLAG_NO_MAPCHANGE);
     }
+    else if (dispatch_dead) DispatchKeyValue(victim, "targetname", "zm_unit_dead");
     
     remove_ZM_glow(victim);
 
@@ -2260,7 +2252,7 @@ public void OnPlayerRunCmdPost(int client, int buttons, int impulse, const float
    	{
        	if (!use_pressed)
        	{
-           	if (live_SI>0) ZMControlSI(client,0);
+           	if (live_SI>0) ZMControlSI(client);
            	else open_menu(client,ZM_MENU_SPECIAL);
            	use_pressed = true;
        	}
@@ -2792,125 +2784,137 @@ public void OnClientDisconnect(int client)
 
 public void OnEntityDestroyed(int entity)
 {
-    if ( !g_bCvarAllow || zm_stage<ZM_PREP || !IsValidEntity(entity) ) return;
+    if ( !g_bCvarAllow || zm_stage<ZM_PREP || zm_stage>=ZM_END || !IsValidEntity(entity) ) return;
+
+    int group = -1;
+    if (entity>0 && entity<=MaxClients) group = GROUP_SPECIAL;
+    else
+    {
+        static char class[32];
+        GetEntityClassname(entity, class, sizeof(class));
+        switch (class[0])
+        {
+            case 'i':
+            {
+                if (strcmp(class,"infected")==0) group = GROUP_COMMON;
+            }
+            case 'w':
+            {
+                if (strcmp(class,"witch")==0) group = GROUP_WITCH;
+            }
+            case 'p':
+            {
+                if (strcmp(class,"player")==0) group = GROUP_SPECIAL;
+            }
+        }
+    }
+    if (group<0) return;
     
 	int max_health = GetEntProp(entity,Prop_Data,"m_iMaxHealth");
-	//if (DEBUG) LogMessage("[zm] OnEntityDestroyed MaxHP %d", max_health);
-	if (max_health>0)
+	if (max_health<=0) return;
+
+    static char targetName[32];
+    GetEntPropString(entity, Prop_Data, "m_iName", targetName, sizeof(targetName));
+
+    int health = GetEntProp(entity,Prop_Data,"m_iHealth");
+    bool refund = health>=max_health && strcmp(targetName,"zm_unit",false)==0;
+    int bank_refund = -1;
+    switch (group)
     {
-          static char targetName[32];
-          GetEntPropString(entity, Prop_Data, "m_iName", targetName, sizeof(targetName));
-          if (strncmp(targetName,"zm_unit",7,false)!=0) return; // Skip logic for non zombie master units
-
-          int health = GetEntProp(entity,Prop_Data,"m_iHealth");
-	      bool refund = (health>=max_health);
-
-          static char class[32];
-          GetEntityClassname(entity, class, sizeof(class));
-       	  
-       	  int bank_refund = -1;
-       	  
-       	  if (strcmp(class,"infected")==0)
-       	  {
-      	     if (refund)
-      	     {
-          	     if (IsValidEdict(entity) && g_iCostList[entity]>=0) bank_refund = g_iCostList[entity];
-                 else bank_refund = calculate_infected_cost(GetEntProp(entity,Prop_Send,"m_Gender"));
-                 add_available_zombie(ZOMBIECLASS_COMMON,1);
-  	         }
-   	      }
-       	  else if (strcmp(class,"witch")==0)
-       	  {
-       	     if (refund && strcmp(targetName,"zm_unit_spotted")==0) refund = false;
-       	     
-             if (refund)
-             {
-                if (IsValidEdict(entity) && g_iCostList[entity]>=0)
+        case GROUP_COMMON:
+        {
+            if (!refund) return;
+            if (IsValidEdict(entity) && g_iCostList[entity]>=0) bank_refund = g_iCostList[entity];
+            else bank_refund = calculate_infected_cost(GetEntProp(entity,Prop_Send,"m_Gender"));
+            add_available_zombie(ZOMBIECLASS_COMMON,1);
+        }
+        case GROUP_WITCH:
+        {
+            if (!refund)
+            {
+                create_timer_add_available_zombie(g_fWitchCooldown,ZOMBIECLASS_WITCH,roundcount);
+                return;
+            }
+            if (IsValidEdict(entity) && g_iCostList[entity]>=0)
+            {
+                bank_refund = g_iCostList[entity];
+            }
+            else
+            {
+                // Figuring out if witch is stationary or moving
+                int m_nSequence = GetEntProp(entity,Prop_Data,"m_nSequence");
+                if (m_nSequence==4 || m_nSequence==27)
                 {
-                    bank_refund = g_iCostList[entity];
+                    bank_refund = g_iCostWitchStatic;
+                    if (DEBUG) LogMessage("[zm] Refunding static witch");
                 }
-                else
+                else if (m_nSequence==10 || m_nSequence==11 || m_nSequence==2)
                 {
-                    // Figuring out if witch is stationary or moving
-                    int m_nSequence = GetEntProp(entity,Prop_Data,"m_nSequence");
-                    if (m_nSequence==4 || m_nSequence==27)
-                    {
-                        bank_refund = g_iCostWitchStatic;
-                        if (DEBUG) LogMessage("[zm] Refunding static witch");
-                    }
-                    else if (m_nSequence==10 || m_nSequence==11 || m_nSequence==2)
-                    {
-                        bank_refund = g_iCostWitchMoving;
-                        if (DEBUG) LogMessage("[zm] Refunding moving witch");
-                    }
-                    if (bank_refund<0)
-                    {
-                        if (DEBUG) LogMessage("[zm] Refunding cheapest witch");
-                        if (g_hCostWitchStatic<g_hCostWitchMoving) bank_refund=g_iCostWitchStatic;
-                        else bank_refund=g_iCostWitchMoving;
-                    }
+                    bank_refund = g_iCostWitchMoving;
+                    if (DEBUG) LogMessage("[zm] Refunding moving witch");
                 }
-                add_available_zombie(ZOMBIECLASS_WITCH,1);
-             }
-       	     else
-       	     {
-           	     create_timer_add_available_zombie(g_fWitchCooldown,ZOMBIECLASS_WITCH,roundcount);
-       	     }
-       	  }
-       	  else if (strcmp(class,"player")==0 && GetClientTeam(entity)==TEAM_INFECTED)
-       	  {
-           	 int client = EntRefToEntIndex(entity);
-           	 if ( !IsClientInGame(client) || !IsPlayerAlive(client)) return;
-           	 if (L4D_IsPlayerIncapacitated(entity)) return;
-           	 int zClass = GetEntProp(entity, Prop_Send, "m_zombieClass");
-             if (zClass<ZOMBIECLASS_SMOKER || zClass>ZOMBIECLASS_TANK || zClass==7) return;
-             
-             // Prevent refunds if ability is still on cooldown
-             if (zClass!=ZOMBIECLASS_HUNTER) //  Hunters don't have cooldown
-             {
-                 int ability = GetEntPropEnt(entity, Prop_Send, "m_customAbility");
-                 if (ability > 0 && IsValidEdict(ability))
-                 {
-                     if ((GetEntPropFloat(ability, Prop_Send, "m_timestamp")-GetGameTime())>1.0) 
-                        refund = false;
-                 }
-             }
-
-             if (refund)
-             {
-                 if (zClass==ZOMBIECLASS_TANK)
-                 {
-                     if (first_tank_stage==FIRST_TANK_SPAWNED)
-                     {
-                         bank_refund = first_tank_price;
-                         first_tank_stage = 0;
-                         update_dynamic_tank();
-                     }
-                     else bank_refund = g_hCostTank.IntValue;
-                 }
-                 else bank_refund = costs_SI[zClass];
-                 add_available_zombie(zClass,1);
-             }
-             else
-             {
-                 float cooldown_time;
-                 if (zClass==ZOMBIECLASS_TANK)
-                 {
-                     cooldown_time = g_fTankCooldown;
-                     if (first_tank_stage==FIRST_TANK_SPAWNED) first_tank_stage += 1;
-                 }
-                 else cooldown_time = g_fSpecialCooldown;
-        	     create_timer_add_available_zombie(cooldown_time,zClass,roundcount);
-             }
-       	  }
-       	  else return;
-       	  
-       	  if (refund && bank_refund>0)
-       	  {
-           	  bank += bank_refund;
-           	  if (DEBUG) LogMessage("OnEntityDestroyed %s refunded %d", class, bank_refund);
-       	  }
- 	         
+                if (bank_refund<0)
+                {
+                    if (DEBUG) LogMessage("[zm] Refunding cheapest witch");
+                    if (g_hCostWitchStatic<g_hCostWitchMoving) bank_refund=g_iCostWitchStatic;
+                    else bank_refund=g_iCostWitchMoving;
+                }
+            }
+            add_available_zombie(ZOMBIECLASS_WITCH,1);
+        }
+        default: // GROUP_SPECIAL
+        {
+            if (!IsValidClient(entity) || GetClientTeam(entity)!=TEAM_INFECTED || !IsPlayerAlive(entity)) return;
+            int zClass = GetEntProp(entity, Prop_Send, "m_zombieClass");
+            if (get_zombieclass_group(zClass)!=GROUP_SPECIAL) return;
+            // survival: every non-ZM tank death gives ZM bank
+            if (!refund && zClass==ZOMBIECLASS_TANK && L4D_IsSurvivalMode() && strncmp(targetName,"zm_",3,false)!=0)
+            {
+                if (DEBUG) LogMessage("[zm] Survival non-ZM tank died");
+                bank += g_iBonusSurvival*g_iAliveSurvivors;
+                update_hint("%T", "Tank died reward", zm_client);
+                if (IsValidClientZM()) EmitSoundToClient(zm_client,SOUND_REWARD);
+            }
+            if (refund && L4D_IsPlayerIncapacitated(entity)) refund = false;
+            // Prevent refunds if ability is still on cooldown
+            if (refund && zClass!=ZOMBIECLASS_HUNTER) // Hunters don't have cooldown
+            {
+                int ability = GetEntPropEnt(entity, Prop_Send, "m_customAbility");
+                if (ability>0 && IsValidEntity(ability) && IsValidEdict(ability))
+                {
+                    if ((GetEntPropFloat(ability, Prop_Send, "m_timestamp")-GetGameTime())>1.0) 
+                    refund = false;
+                }
+            }
+            if (refund)
+            {
+                if (zClass==ZOMBIECLASS_TANK)
+                {
+                    if (first_tank_stage==FIRST_TANK_SPAWNED)
+                    {
+                        bank_refund = first_tank_price;
+                        first_tank_stage = 0;
+                        update_dynamic_tank();
+                    }
+                    else bank_refund = g_hCostTank.IntValue;
+                }
+                else bank_refund = costs_SI[zClass];
+                add_available_zombie(zClass,1);
+            }
+            else
+            {
+                float cooldown_time = get_class_cooldown(zClass);
+                if (zClass==ZOMBIECLASS_TANK && first_tank_stage==FIRST_TANK_SPAWNED) first_tank_stage += 1;
+                create_timer_add_available_zombie(cooldown_time,zClass,roundcount);
+            }
+        }
     }
-	
+
+    if (bank_refund>0)
+    {
+        bank += bank_refund;
+        DispatchKeyValue(entity, "targetname", "zm_unit_dead"); // prevent refund stacking
+        if (DEBUG) LogMessage("OnEntityDestroyed %d %d refunded %d", entity, group, bank_refund);
+    }
+ 	         
 }

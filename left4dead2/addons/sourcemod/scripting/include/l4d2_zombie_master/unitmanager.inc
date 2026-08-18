@@ -43,7 +43,7 @@ bool verify_stutter_fixed()
     }
     if ( GetGameTime()>(t_stutter+5.0) )
     {
-        LogMessage("[zm] Tank stutter fix timed out, report this to mod authors");
+        LogMessage("[zm] SI stutter fix timed out, report to mod authors");
         EmitSoundToAll(SOUND_BUG);
         return true;
     }
@@ -349,11 +349,16 @@ bool is_zombie_available_cooldown(int zClass)
     return false;
 }
 
-// Cooldowns for specials and witches
+// Cooldowns for specials and witches. -1.0 for infinite cooldown
 float get_class_cooldown(int ZOMBIECLASS)
 {
     switch (ZOMBIECLASS)
     {
+        case ZOMBIECLASS_COMMON:
+        {
+            if (g_fCommonRate<=0.0) return -1.0;
+            return 1.0/g_fCommonRate;
+        }
         case ZOMBIECLASS_WITCH: return g_fWitchCooldown;
         case ZOMBIECLASS_TANK: return g_fTankCooldown;
         case ZOMBIECLASS_SPITTER: return g_fSpitterCooldown;
@@ -380,9 +385,11 @@ void sanity_check_available(int zClass, float t_now = -1.0)
 
 void create_timer_add_available_zombie(float delay,int zClass, int round, int count=1)
 {
+    if (count>0 && available_zombie_arr[zClass]>=max_zombie_arr[zClass]) return;
     // sourcemod timers cannot be smaller than 0.1
     if (delay<0.1)
     {
+        if (delay<0.0) return;
         add_available_zombie(zClass);
         return;
     }
@@ -428,13 +435,7 @@ void add_available_zombie(int zClass, int add=1, bool draw = true)
     else if (available_zombie_arr[zClass]<0) available_zombie_arr[zClass] = 0;
      
     // Will this operation change available Specials?
-    int add_SI;
-    switch (zClass)
-    {
-        case ZOMBIECLASS_COMMON: add_SI=0;
-        case ZOMBIECLASS_WITCH: add_SI=0;
-        default: add_SI = add;
-    }
+    int add_SI = get_zombieclass_group(zClass)==GROUP_SPECIAL ? add : 0;
     
     if (add_SI!=0)
     {

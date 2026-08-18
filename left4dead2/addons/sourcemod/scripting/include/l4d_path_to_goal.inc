@@ -1384,10 +1384,11 @@ void OnFramePrep(bool new_frame = true)
                         L4D_GetNavAreaCenter(nav_connection.navArea,pos_temp);
                         pos_temp[2] += 16.0;
                         dz = pos_curr[2] - pos_temp[2];
-                        bool steep = nav_connection.connectiontype == CONNECTED_ADJACENT && nav_too_steep(navArea_curr,nav_connection.navArea);
+                        bool steep = dz>0.0 && nav_connection.connectiontype == CONNECTED_ADJACENT && nav_too_steep(nav_connection.navArea,navArea_curr);
                         if (found && steep)
                         {
                             if (!best_steep || dz>dz_best) continue; // prefer to go down than up
+                            //if (!best_steep) continue; // prefer to go down than up
                         }
                         if ( flow_better(flow_temp,flow_best,finale_backwards) || (best_steep && flow_better(flow_temp,flow_curr,finale_backwards)) )
                         {

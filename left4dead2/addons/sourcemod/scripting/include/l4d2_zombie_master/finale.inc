@@ -99,8 +99,70 @@ void announce_finale()
         //     TheDirector = CDirector(DirectorPointer);
         //     RequestFrame(OnFinaleFrame);
         // }
+        //FinaleStarted();
     }
 }
+
+stock void FinaleStarted()
+{
+    if (!g_DHook_AcceptInput) return;
+    int entity = -1;
+   	while ((entity = FindEntityByClassname(entity, "trigger_finale")) != -1)
+   	{	
+   		LogMessage("trigger_finale %d -> DHook_Finale_AcceptInput", entity);
+        DHookEntity(g_DHook_AcceptInput, false, entity, INVALID_FUNCTION, DHook_Finale_AcceptInput);
+   	}
+    entity = -1;
+    while ((entity = FindEntityByClassname(entity, "finale_trigger")) != -1)
+   	{	
+   		LogMessage("finale_trigger %d -> DHook_Finale_AcceptInput", entity);
+        DHookEntity(g_DHook_AcceptInput, false, entity, INVALID_FUNCTION, DHook_Finale_AcceptInput);
+   	}
+    entity = -1;
+    while ((entity = FindEntityByClassname(entity, "info_director")) != -1)
+   	{	
+   		LogMessage("info_director %d -> DHook_Director_Finale_AcceptInput", entity);
+        DHookEntity(g_DHook_AcceptInput, false, entity, INVALID_FUNCTION, DHook_Director_Finale_AcceptInput);
+   	}
+}
+
+MRESReturn DHook_Finale_AcceptInput(int pThis, DHookReturn hReturn, DHookParam hParams)
+{
+	//if (!g_bCvarAllow || !ZM_finale_announced || live_zombie_arr[ZOMBIECLASS_TANK]<=0) return MRES_Ignored;
+	static char inputName[32];
+	hParams.GetString(1, inputName, sizeof(inputName));
+	// if (strcmp(inputName,"AdvanceFinaleState",false)==0)
+	// {
+	//    int current = L4D2_GetCurrentFinaleStage();
+    //    if (current==FINALE_CUSTOM_TANK || current==FINALE_FINAL_BOSS || current==FINALE_HALFTIME_BOSS || current==FINALE_GAUNTLET_BOSS)
+    //    {
+    //         LogMessage("trigger_finale MRES_Supercede input %s", inputName);
+    //         return MRES_Supercede;
+    //    }
+	// }
+    LogMessage("trigger_finale MRES_Ignored input %s", inputName);
+	return MRES_Ignored;
+}
+
+MRESReturn DHook_Director_Finale_AcceptInput(int pThis, DHookReturn hReturn, DHookParam hParams)
+{
+	static char inputName[32];
+	hParams.GetString(1, inputName, sizeof(inputName));
+    LogMessage("info_director MRES_Ignored input %s", inputName);
+	return MRES_Ignored;
+}
+
+stock void AdvanceFinaleState()
+{
+    int entity = -1;
+   	while ((entity = FindEntityByClassname(entity, "trigger_finale")) != -1)
+   	{	
+   		AcceptEntityInput(entity, "AdvanceFinaleState");
+   	}
+}
+
+//if (g_DHook_AcceptInput && IsValidEntity(info_director)) // Listen to all info_director inputs
+//    	DHookEntity(g_DHook_AcceptInput, false, info_director, INVALID_FUNCTION, DHook_Director_AcceptInput);
 
 // // Enforce Tank count in Director memory to prevent ZMControlSI on Tanks from advancing Finale stage.
 // void OnFinaleFrame(const bool once = false)

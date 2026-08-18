@@ -133,6 +133,16 @@ int ZM_Horde(
 	if (DEBUG) LogMessage("[zm] ZM_Horde");
 	
 	if (client == zm_client && gamerules_allow_zClass(ZOMBIECLASS_COMMON)) update_spawner_zombieclass(ZOMBIECLASS_COMMON);
+	if (!Spawner_Can_Spawn(client))
+	{
+		if (hint && IsValidClientZM() && client==zm_client)
+		{
+			ZM_Sound_Deny();
+			update_hint("%T", "Zombie spawns OFF", zm_client);
+		}
+		return 0;
+	}
+
 	float t_start = GetEngineTime(); // for profiling
 	
 	if (hint && is_zm_spamming())
@@ -359,8 +369,7 @@ int ZM_Horde(
                SetEntPropFloat(zombie,Prop_Send,"m_flModelScale",GetRandomFloat(0.5,2.0)); 
                ChangeEdictState(zombie);
            }
-           if (type[0]!=0 || price_angry) DispatchKeyValue(zombie, "targetname", "zm_unit_uncommon");
-           else DispatchKeyValue(zombie, "targetname", "zm_unit_common");
+           DispatchKeyValue(zombie, "targetname", "zm_unit");
            Spawner_NotifySpawned(zombie);
 		   SET_TRANSMIT_ALWAYS(zombie);
 		   g_iCostList[zombie] = free ? 0 : temp_cost;
@@ -541,6 +550,16 @@ bool ZM_Witch(int client,int witch_type, bool free = false, bool flow = false)
 	}
 
 	if (DEBUG) LogMessage("[zm] ZM_Witch");
+
+	if (!Spawner_Can_Spawn(client))
+	{
+		if (IsValidClientZM() && client==zm_client)
+		{
+			ZM_Sound_Deny();
+			update_hint("%T", "Zombie spawns OFF", zm_client);
+		}
+		return false;
+	}
 
 	if (client==zm_client && is_zm_spamming())
 	{
@@ -782,12 +801,12 @@ void delete_all_infected(bool common=true, bool witch=true, bool special=true)
 		{
 			if (!IsValidClient(i) || !IsFakeClient(i) || !IsPlayerAlive(i) || GetClientTeam(i)!=TEAM_INFECTED) continue;
 			if (delete_special_blocked(i)) continue;
-			if ( (ZM_finale_announced || L4D_IsSurvivalMode()) && GetEntProp(i, Prop_Send, "m_zombieClass")==ZOMBIECLASS_TANK )
-            {
-				static char targetName[16];
-				GetEntPropString(i, Prop_Data, "m_iName", targetName, sizeof(targetName));
-				if (strcmp(targetName,"zm_unit")!=0) continue;
-            }
+			// if ( (ZM_finale_announced || L4D_IsSurvivalMode()) && GetEntProp(i, Prop_Send, "m_zombieClass")==ZOMBIECLASS_TANK )
+            // {
+			// 	static char targetName[16];
+			// 	GetEntPropString(i, Prop_Data, "m_iName", targetName, sizeof(targetName));
+			// 	if (strcmp(targetName,"zm_unit")!=0) continue;
+            // }
 			remove_ZM_glow(i);
 			AcceptEntityInput(i,"Kill");
 		}
@@ -861,9 +880,6 @@ Action ZM_Spawn_Witch(int client, int args)
 	return Plugin_Continue;
 }
 
-// asdf
-// 4. pipe bomb and bile no commons delete
-
 /**
  * Delete the entity the ZM is currently pointing at (tracked via entref_delete).
  * Validates the target, protects non-ZM tanks during finale/survival,
@@ -897,14 +913,14 @@ void zm_del_pointing(int client)
    {
        if (IsFakeClient(target) && GetClientTeam(target)==TEAM_INFECTED && !delete_special_blocked(target))
        {
-		   if ( (ZM_finale_announced || L4D_IsSurvivalMode()) &&
-               GetEntProp(target, Prop_Send, "m_zombieClass")==ZOMBIECLASS_TANK )
-           {
-               static char targetName[16];
-               GetEntPropString(target, Prop_Data, "m_iName", targetName, sizeof(targetName));
-               if (strcmp(targetName,"zm_unit")!=0) group = -1;
-           }
-           else group = GROUP_SPECIAL;
+		   group = GROUP_SPECIAL;
+		//    if ( (ZM_finale_announced || L4D_IsSurvivalMode()) &&
+        //        GetEntProp(target, Prop_Send, "m_zombieClass")==ZOMBIECLASS_TANK )
+        //    {
+        //        static char targetName[16];
+        //        GetEntPropString(target, Prop_Data, "m_iName", targetName, sizeof(targetName));
+        //        if (strcmp(targetName,"zm_unit")!=0) group = -1; // prevent delete of non-ZM units
+        //    }
        }
    }
    else
@@ -1014,6 +1030,16 @@ int ZM_Spawn_SI(int client, int ZOMBIECLASS, bool free = false, bool setpos=fals
 	//LogMessage("[zm] ZM_Spawn_SI %d %d", ZOMBIECLASS, flow);
 	if (gamerules_allow_zClass(ZOMBIECLASS)) update_spawner_zombieclass(ZOMBIECLASS);
     
+	if (!Spawner_Can_Spawn(client))
+	{
+		if (IsValidClientZM() && client==zm_client)
+		{
+			ZM_Sound_Deny();
+			update_hint("%T", "Zombie spawns OFF", zm_client);
+		}
+		return -1;
+	}
+	
 	if (!setpos && is_zm_spamming())
 	{
 		if (client==zm_client) ZM_Sound_Deny();
