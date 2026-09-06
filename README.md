@@ -1,6 +1,6 @@
 # l4d2_zombie_master
 
-[b] THIS PROJECT HAS MOVED TO CODEBERG! https://codeberg.org/gvazdas/l4d2_zombie_master [/b]
+**THIS PROJECT HAS MOVED TO CODEBERG! https://codeberg.org/gvazdas/l4d2_zombie_master**
 
 [![YouTube Gameplay Video](http://img.youtube.com/vi/0uPRHrDEA2U/0.jpg)](https://www.youtube.com/watch?v=0uPRHrDEA2U "YouTube Gameplay Video")
 
